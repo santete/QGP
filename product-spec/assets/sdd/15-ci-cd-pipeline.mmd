@@ -1,0 +1,8 @@
+flowchart LR
+  commit["Commit / MR"] --> validate["validate: markdownlint + frontmatter + BR lint"]
+  validate --> build["build: dotnet publish + npm build"]
+  build --> test["test: unit + integration (Testcontainers)"]
+  test --> pkg["package: docker build + push registry"]
+  pkg --> stg["deploy staging + smoke"]
+  stg --> approve{"MR merged + approve"}
+  approve --> prod["deploy prod (Ubuntu)"]

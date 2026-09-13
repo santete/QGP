@@ -1,0 +1,13 @@
+sequenceDiagram
+  actor A as Author
+  participant API as qgp-api
+  participant AP as Approver
+  participant DB as Postgres
+  A->>API: POST /versions (change_type=major)
+  API->>DB: tạo bản major, status=UnderRevision
+  API-->>A: cảnh báo impacts (DOC-F-07)
+  A->>API: submit (chuyen sang InReview)
+  AP->>API: approve
+  A->>API: publish (x.0)
+  API->>DB: set Effective va reset acknowledgements (BR-05/08)
+  API->>DB: audit_log(action=major_publish)

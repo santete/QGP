@@ -1,0 +1,314 @@
+openapi: 3.1.0
+info:
+  title: qgp-rag — Internal RAG Service API (contract .NET ↔ Python)
+  version: 0.1.0
+  description: |
+    Hợp đồng nội bộ giữa qgp-api (.NET, caller) và qgp-rag (Python: FastAPI + LlamaIndex, callee) — ADR-0007. Chỉ gọi trong mạng nội bộ (service-to-service). qgp-api chịu trách nhiệm CHỈ gửi nội dung tài liệu Effective để index (enforce BR-06 / OD-4); qgp-rag coi input là tập được phép index. Mọi câu trả lời answered PHẢI có citation (BOT-F-03); không đủ căn cứ → insufficient (BOT-F-04). Vector store: pgvector.
+  license:
+    name: Proprietary — FPT ISC (internal)
+    url: https://internal.fpt/legal
+servers:
+- url: http://qgp-rag.internal:8100/v1
+  description: Internal cluster network (không expose public)
+security:
+- serviceToken: []
+tags:
+- name: Query
+  description: Hỏi–đáp RAG
+- name: Index
+  description: Index tài liệu Effective
+- name: Ops
+  description: Vận hành & health
+paths:
+  /query:
+    post:
+      tags:
+      - Query
+      summary: Hỏi–đáp RAG có trích nguồn (BOT-F-01/03/04)
+      operationId: query
+      description: |
+        Retrieval chỉ trên corpus Effective đã index. Nếu không đủ căn cứ để trích nguồn → trả status=insufficient (answer=null) và ghi log câu hỏi (BOT-F-06). Không bao giờ trả answer khẳng định mà thiếu citations.
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - question
+              properties:
+                question:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                lang:
+                  type: string
+                  enum:
+                  - vi
+                  - en
+                  default: vi
+                top_k:
+                  type: integer
+                  default: 6
+                  minimum: 1
+                  maximum: 20
+                filters:
+                  type: object
+                  description: Lọc thêm (tùy chọn) — vd theo audience_roles của user để phù hợp ngữ cảnh
+                  properties:
+                    audience_roles:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        '200':
+          description: Kết quả (answered với citations, hoặc insufficient)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+              examples:
+                answered:
+                  value:
+                    status: answered
+                    answer: Quality Gate 1 yeu cau ...
+                    citations:
+                    - doc_id: QA-PROC-005
+                      version: '2.1'
+                      effective_date: '2026-07-15'
+                      url: /documents/QA-PROC-005
+                      snippet: '...'
+                    unanswered_logged: false
+                insufficient:
+                  value:
+                    status: insufficient
+                    answer: null
+                    citations: []
+                    unanswered_logged: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /index/upsert:
+    post:
+      tags:
+      - Index
+      summary: Index / cập nhật một tài liệu Effective (BOT-F-05)
+      operationId: upsertIndex
+      description: |
+        qgp-api gọi khi một version trở thành Effective (WF-03) hoặc khi reindex. Idempotent theo doc_id — upsert THAY THẾ toàn bộ chunk của doc_id đó (đảm bảo chỉ 1 bản Effective được phản ánh, BR-02/BR-06).
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertRequest'
+      responses:
+        '200':
+          description: Đã index
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  doc_id:
+                    type: string
+                  version:
+                    type: string
+                  chunks:
+                    type: integer
+                  indexed:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /index/{doc_id}:
+    delete:
+      tags:
+      - Index
+      summary: Gỡ tài liệu khỏi index (khi Superseded/Retired — BR-06)
+      operationId: deleteIndex
+      description: qgp-api gọi khi tài liệu không còn Effective (bị supersede hoặc retire).
+      parameters:
+      - name: doc_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/RequestId'
+      responses:
+        '204':
+          description: Đã gỡ (idempotent — không lỗi nếu chưa tồn tại)
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /reindex:
+    post:
+      tags:
+      - Ops
+      summary: Rebuild toàn bộ index (runbook RB-02)
+      operationId: reindex
+      description: |
+        Nhận danh sách tài liệu Effective (nguồn sự thật do qgp-api cung cấp) và rebuild từ đầu. Dùng khi index lỗi/lệch. Chạy nền, idempotent.
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - documents
+              properties:
+                documents:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/UpsertRequest'
+      responses:
+        '202':
+          description: Đã nhận, rebuild chạy nền
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /healthz:
+    get:
+      tags:
+      - Ops
+      summary: Health check
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                    - degraded
+                  index_docs:
+                    type: integer
+                  llm_reachable:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/DefaultError'
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: |
+        Token service-to-service (client credentials) do qgp-api trình. Mạng nội bộ + (khuyến nghị) mTLS. KHÔNG dùng token người dùng cuối ở tầng này.
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Correlation id để trace xuyên .NET ↔ Python (OpenTelemetry, ADR-0013)
+  responses:
+    BadRequest:
+      description: Payload không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Thiếu/không hợp lệ service token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    DefaultError:
+      description: Lỗi (client/nghiệp vụ) — xem code trong Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    UpsertRequest:
+      type: object
+      required:
+      - doc_id
+      - version
+      - markdown
+      properties:
+        doc_id:
+          type: string
+        version:
+          type: string
+        title:
+          type: string
+        effective_date:
+          type: string
+          format: date
+        url:
+          type: string
+          description: link nội bộ tới tài liệu (dùng cho citation)
+        audience_roles:
+          type: array
+          items:
+            type: string
+        markdown:
+          type: string
+          description: nội dung Markdown bản Effective (nguồn để chunk + embed)
+    QueryResponse:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - answered
+          - insufficient
+        answer:
+          type:
+          - string
+          - 'null'
+        citations:
+          type: array
+          description: bắt buộc non-empty khi status=answered (BOT-F-03)
+          items:
+            type: object
+            required:
+            - doc_id
+            - version
+            - url
+            properties:
+              doc_id:
+                type: string
+              version:
+                type: string
+              effective_date:
+                type: string
+                format: date
+              url:
+                type: string
+              snippet:
+                type: string
+        unanswered_logged:
+          type: boolean
+          description: true khi insufficient và đã log (BOT-F-06)
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string

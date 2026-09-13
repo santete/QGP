@@ -1,0 +1,15 @@
+flowchart LR
+  person_reader["[Person] Reader / New joiner<br/>Nhân viên tra cứu quy trình"]
+  person_author["[Person] Author / Approver<br/>Soạn & duyệt tài liệu"]
+  person_qa["[Person] QA Governance Lead / Admin<br/>Quản trị, báo cáo"]
+  sys_qgp["[Software System] QGP<br/>Quản trị tài liệu quy trình & chất lượng"]
+  sys_sso["[External] SSO nội bộ (OIDC)"]
+  sys_git["[External] GitLab<br/>Git repo + CI/CD"]
+  sys_llm["[External] LLM API (P3)"]
+
+  person_reader -->|"tra cứu, feedback, hỏi BOT [HTTPS]"| sys_qgp
+  person_author -->|"soạn, submit, duyệt, publish [HTTPS]"| sys_qgp
+  person_qa -->|"cấu hình, xem báo cáo, audit [HTTPS]"| sys_qgp
+  sys_qgp -->|"xác thực người dùng [OIDC]"| sys_sso
+  sys_qgp -->|"đọc/ghi nội dung Markdown [git]"| sys_git
+  sys_qgp -->|"sinh câu trả lời có trích nguồn [HTTPS]"| sys_llm

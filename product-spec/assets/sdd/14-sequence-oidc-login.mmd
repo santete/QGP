@@ -1,0 +1,11 @@
+sequenceDiagram
+  actor U as User
+  participant WEB as Web UI
+  participant API as qgp-api
+  participant IDP as SSO IdP
+  U->>WEB: mở QGP
+  WEB->>IDP: redirect OIDC authorize
+  IDP-->>WEB: authorization code
+  WEB->>API: code
+  API->>IDP: exchange code -> tokens
+  API-->>WEB: session (role từ claims)

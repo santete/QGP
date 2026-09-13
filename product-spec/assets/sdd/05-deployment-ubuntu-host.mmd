@@ -1,0 +1,27 @@
+flowchart TB
+  subgraph host["Ubuntu host nội bộ (docker-compose)"]
+    ngx["nginx:443 (TLS)"]
+    cweb["container: qgp-web"]
+    capi["container: qgp-api (:8080)"]
+    crag["container: qgp-rag (:8100, P3)"]
+    cpg[("container: postgres:5432 + pgvector")]
+    cidx[("container: meilisearch:7700")]
+    credis[("container: redis:6379")]
+    cotel["container: otel-collector + grafana/loki/tempo/prometheus"]
+  end
+  vault["Vault (secrets)"]
+  gitlab["GitLab (repo + CI/CD registry)"]
+  idp["SSO IdP (OIDC)"]
+
+  ngx --> cweb
+  ngx --> capi
+  capi --> cpg
+  capi --> cidx
+  capi --> credis
+  capi --> crag
+  crag --> cpg
+  capi -->|"secrets"| vault
+  capi -->|"OIDC"| idp
+  gitlab -->|"deploy image"| host
+  capi -->|"OTLP"| cotel
+  crag -->|"OTLP"| cotel

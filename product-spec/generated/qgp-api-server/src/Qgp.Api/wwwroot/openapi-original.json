@@ -1,0 +1,1685 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "contact" : {
+      "name" : "QGP Engineering (SA/TL)"
+    },
+    "description" : "Public REST API cho QGP (qgp-api, .NET 8). Sinh từ SDD-QGP-001 §3, map từ PRD-QGP-001 v1.0. Base path /v1. Auth Bearer (OIDC). Verb unsafe cần header Idempotency-Key. Error code theo ISC Internal Standard — API & Error Code.\n",
+    "license" : {
+      "name" : "Proprietary — FPT ISC (internal)",
+      "url" : "https://internal.fpt/legal"
+    },
+    "title" : "QGP — Quality Governance Portal API",
+    "version" : "0.1.0"
+  },
+  "servers" : [ {
+    "description" : "Prod (nội bộ)",
+    "url" : "https://qgp.internal.fpt/v1"
+  }, {
+    "description" : "Staging",
+    "url" : "https://staging.qgp.internal.fpt/v1"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "tags" : [ {
+    "description" : "Quản trị tài liệu & vòng đời",
+    "name" : "Documents"
+  }, {
+    "description" : "Phiên bản, phê duyệt, ban hành, acknowledgement",
+    "name" : "Versions"
+  }, {
+    "description" : "Tra cứu full-text",
+    "name" : "Search"
+  }, {
+    "description" : "Gợi ý tài liệu theo role",
+    "name" : "Recommendations"
+  }, {
+    "description" : "Phản hồi & triage",
+    "name" : "Feedback"
+  }, {
+    "description" : "Báo cáo quản trị (aggregate)",
+    "name" : "Reports"
+  }, {
+    "description" : "Truy vết audit log",
+    "name" : "Audit"
+  }, {
+    "description" : "Trợ lý AI (RAG, P3)",
+    "name" : "Assistant"
+  } ],
+  "paths" : {
+    "/documents" : {
+      "get" : {
+        "operationId" : "listDocuments",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/Query"
+        }, {
+          "$ref" : "#/components/parameters/FilterType"
+        }, {
+          "$ref" : "#/components/parameters/FilterTag"
+        }, {
+          "$ref" : "#/components/parameters/FilterStatus"
+        }, {
+          "$ref" : "#/components/parameters/Cursor"
+        }, {
+          "$ref" : "#/components/parameters/Limit"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/listDocuments_200_response"
+                }
+              }
+            },
+            "description" : "Trang tài liệu"
+          },
+          "401" : {
+            "$ref" : "#/components/responses/Unauthorized"
+          }
+        },
+        "summary" : "Danh sách / filter tài liệu (KB-F-03)",
+        "tags" : [ "Documents" ]
+      },
+      "post" : {
+        "operationId" : "createDocument",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateDocumentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Document"
+                }
+              }
+            },
+            "description" : "Đã tạo (Draft)"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/Forbidden"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            },
+            "description" : "Trùng doc_id (BR-01)"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationError"
+          }
+        },
+        "summary" : "Tạo tài liệu với metadata (DOC-F-01, UC-01)",
+        "tags" : [ "Documents" ]
+      }
+    },
+    "/documents/{doc_id}" : {
+      "get" : {
+        "operationId" : "getDocument",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/DocId"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DocumentDetail"
+                }
+              }
+            },
+            "description" : "Tài liệu (bản Effective hoặc cảnh báo non-Effective)"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        },
+        "summary" : "Lấy bản Effective + badge trạng thái (DOC-F-12, UC-07/08)",
+        "tags" : [ "Documents" ]
+      }
+    },
+    "/documents/{doc_id}/versions" : {
+      "get" : {
+        "operationId" : "listVersions",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/DocId"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/DocumentVersion"
+                  },
+                  "type" : "array",
+                  "default" : null
+                }
+              }
+            },
+            "description" : "Danh sách version"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Lịch sử phiên bản (DOC-F-06, UC-09)",
+        "tags" : [ "Versions" ]
+      },
+      "post" : {
+        "operationId" : "createVersion",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/DocId"
+        }, {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateVersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DocumentVersion"
+                }
+              }
+            },
+            "description" : "Version mới (Draft/UnderRevision)"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/Forbidden"
+          }
+        },
+        "summary" : "Tạo revision minor/major (DOC-F-02, UC-05/06)",
+        "tags" : [ "Versions" ]
+      }
+    },
+    "/documents/{doc_id}/diff" : {
+      "get" : {
+        "operationId" : "getDiff",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/DocId"
+        }, {
+          "description" : "version nguồn (vd 2.0)",
+          "explode" : true,
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "style" : "form"
+        }, {
+          "description" : "version đích (vd 2.1)",
+          "explode" : true,
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "style" : "form"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/getDiff_200_response"
+                }
+              }
+            },
+            "description" : "Kết quả diff"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Diff giữa 2 version (DOC-F-06)",
+        "tags" : [ "Versions" ]
+      }
+    },
+    "/versions/{id}/submit" : {
+      "post" : {
+        "operationId" : "submitVersion",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/VersionId"
+        }, {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "responses" : {
+          "200" : {
+            "$ref" : "#/components/responses/VersionOk"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/Forbidden"
+          },
+          "409" : {
+            "$ref" : "#/components/responses/StateConflict"
+          }
+        },
+        "summary" : "Submit review (DOC-F-04, UC-01) — Draft → InReview",
+        "tags" : [ "Versions" ]
+      }
+    },
+    "/versions/{id}/approve" : {
+      "post" : {
+        "operationId" : "approveVersion",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/VersionId"
+        }, {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/approveVersion_request"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "$ref" : "#/components/responses/VersionOk"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/Forbidden"
+          },
+          "409" : {
+            "$ref" : "#/components/responses/StateConflict"
+          }
+        },
+        "summary" : "Approve / Reject kèm nhận xét (DOC-F-04, UC-02)",
+        "tags" : [ "Versions" ]
+      }
+    },
+    "/versions/{id}/publish" : {
+      "post" : {
+        "operationId" : "publishVersion",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/VersionId"
+        }, {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "examples" : {
+                "future_effective" : {
+                  "summary" : "effective_date tương lai (Approved ≠ Effective)",
+                  "value" : {
+                    "issue_date" : "2026-07-01",
+                    "effective_date" : "2026-07-15",
+                    "change_summary" : "Cap nhat tieu chi Quality Gate 1"
+                  }
+                }
+              },
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishResult"
+                }
+              }
+            },
+            "description" : "Đã publish"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/Forbidden"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            },
+            "description" : "Version đã publish — bất biến (BR-03)"
+          },
+          "422" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            },
+            "description" : "Thiếu change_summary (BR-04) hoặc effective_date < issue_date (BR-07)"
+          }
+        },
+        "summary" : "Publish với ngày ban hành/áp dụng (DOC-F-03, UC-03, BR-04/BR-07)",
+        "tags" : [ "Versions" ]
+      }
+    },
+    "/versions/{id}/acknowledge" : {
+      "post" : {
+        "operationId" : "acknowledgeVersion",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/VersionId"
+        }, {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Acknowledgement"
+                }
+              }
+            },
+            "description" : "Đã ghi nhận acknowledgement"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Xác nhận đã đọc tài liệu bắt buộc (DOC-F-09, UC-10)",
+        "tags" : [ "Versions" ]
+      }
+    },
+    "/search" : {
+      "get" : {
+        "operationId" : "search",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/Query"
+        }, {
+          "$ref" : "#/components/parameters/FilterTag"
+        }, {
+          "$ref" : "#/components/parameters/FilterType"
+        }, {
+          "$ref" : "#/components/parameters/Cursor"
+        }, {
+          "$ref" : "#/components/parameters/Limit"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/search_200_response"
+                }
+              }
+            },
+            "description" : "Kết quả tìm kiếm (chỉ tài liệu Effective — BR-06)"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Full-text + filter, < 1s (KB-F-03, NFR-02)",
+        "tags" : [ "Search" ]
+      }
+    },
+    "/recommendations" : {
+      "get" : {
+        "description" : "Gợi ý explainable — chỉ tài liệu Effective trong quyền đọc (BR-11).",
+        "operationId" : "getRecommendations",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Recommendations"
+                }
+              }
+            },
+            "description" : "Nhóm bắt buộc + gợi ý"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Goi y Tai lieu danh cho ban theo role (REC-F-02, UC-23)",
+        "tags" : [ "Recommendations" ]
+      }
+    },
+    "/feedback" : {
+      "post" : {
+        "operationId" : "createFeedback",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateFeedbackRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Feedback"
+                }
+              }
+            },
+            "description" : "Đã tạo feedback (New)"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Gửi feedback in-context (FBK-F-01, UC-15)",
+        "tags" : [ "Feedback" ]
+      }
+    },
+    "/feedback/{id}" : {
+      "patch" : {
+        "operationId" : "triageFeedback",
+        "parameters" : [ {
+          "explode" : false,
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "style" : "simple"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/triageFeedback_request"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Feedback"
+                }
+              }
+            },
+            "description" : "Đã cập nhật"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/Forbidden"
+          }
+        },
+        "summary" : "Triage feedback (FBK-F-03) — QA",
+        "tags" : [ "Feedback" ]
+      }
+    },
+    "/reports/issuance" : {
+      "get" : {
+        "operationId" : "getIssuanceReport",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "additionalProperties" : { }
+                }
+              }
+            },
+            "description" : "Số liệu aggregate"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Thống kê tài liệu ban hành (RPT-F-01, UC-22)",
+        "tags" : [ "Reports" ]
+      }
+    },
+    "/reports/compliance" : {
+      "get" : {
+        "operationId" : "getComplianceReport",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "additionalProperties" : { }
+                }
+              }
+            },
+            "description" : "Tỉ lệ ack + ai chưa đọc"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Compliance acknowledgement (RPT-F-04)",
+        "tags" : [ "Reports" ]
+      }
+    },
+    "/audit" : {
+      "get" : {
+        "operationId" : "listAudit",
+        "parameters" : [ {
+          "explode" : true,
+          "in" : "query",
+          "name" : "document_id",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "style" : "form"
+        }, {
+          "explode" : true,
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "style" : "form"
+        }, {
+          "explode" : true,
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "style" : "form"
+        }, {
+          "$ref" : "#/components/parameters/Cursor"
+        }, {
+          "$ref" : "#/components/parameters/Limit"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/listAudit_200_response"
+                }
+              }
+            },
+            "description" : "Trang audit"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Truy vết audit log (ADM-F-03, UC-21, NFR-03)",
+        "tags" : [ "Audit" ]
+      }
+    },
+    "/assistant/query" : {
+      "post" : {
+        "description" : "Proxy tới qgp-rag. Không citation → không trả lời (BOT-F-03/04). Xem contract qgp-rag.openapi.yaml.",
+        "operationId" : "askAssistant",
+        "parameters" : [ {
+          "$ref" : "#/components/parameters/IdempotencyKey"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/askAssistant_request"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AssistantAnswer"
+                }
+              }
+            },
+            "description" : "Câu trả lời (có citation) hoặc 'không chắc'"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            },
+            "description" : "BOT tắt (kill switch) hoặc qgp-rag không sẵn sàng"
+          },
+          "400" : {
+            "$ref" : "#/components/responses/DefaultError"
+          }
+        },
+        "summary" : "Hỏi–đáp BOT có trích nguồn (P3 — BOT, UC-17/18)",
+        "tags" : [ "Assistant" ]
+      }
+    }
+  },
+  "components" : {
+    "parameters" : {
+      "DocId" : {
+        "description" : "vd QA-PROC-005",
+        "explode" : false,
+        "in" : "path",
+        "name" : "doc_id",
+        "required" : true,
+        "schema" : {
+          "type" : "string"
+        },
+        "style" : "simple"
+      },
+      "VersionId" : {
+        "explode" : false,
+        "in" : "path",
+        "name" : "id",
+        "required" : true,
+        "schema" : {
+          "format" : "uuid",
+          "type" : "string"
+        },
+        "style" : "simple"
+      },
+      "IdempotencyKey" : {
+        "description" : "Bắt buộc cho verb unsafe (§3.4). Same key+body → cache; khác body → 409.",
+        "explode" : false,
+        "in" : "header",
+        "name" : "Idempotency-Key",
+        "required" : true,
+        "schema" : {
+          "format" : "uuid",
+          "type" : "string"
+        },
+        "style" : "simple"
+      },
+      "Query" : {
+        "description" : "từ khoá tìm kiếm",
+        "explode" : true,
+        "in" : "query",
+        "name" : "q",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "style" : "form"
+      },
+      "FilterType" : {
+        "explode" : true,
+        "in" : "query",
+        "name" : "type",
+        "required" : false,
+        "schema" : {
+          "$ref" : "#/components/schemas/DocumentType"
+        },
+        "style" : "form"
+      },
+      "FilterTag" : {
+        "explode" : true,
+        "in" : "query",
+        "name" : "tag",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "style" : "form"
+      },
+      "FilterStatus" : {
+        "explode" : true,
+        "in" : "query",
+        "name" : "status",
+        "required" : false,
+        "schema" : {
+          "$ref" : "#/components/schemas/VersionStatus"
+        },
+        "style" : "form"
+      },
+      "Cursor" : {
+        "description" : "opaque cursor (§3.5)",
+        "explode" : true,
+        "in" : "query",
+        "name" : "cursor",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "style" : "form"
+      },
+      "Limit" : {
+        "explode" : true,
+        "in" : "query",
+        "name" : "limit",
+        "required" : false,
+        "schema" : {
+          "default" : 50,
+          "maximum" : 200,
+          "type" : "integer"
+        },
+        "style" : "form"
+      }
+    },
+    "responses" : {
+      "Unauthorized" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/Error"
+            }
+          }
+        },
+        "description" : "Thiếu/không hợp lệ token"
+      },
+      "Forbidden" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/Error"
+            }
+          }
+        },
+        "description" : "Sai role (RBAC §10.1)"
+      },
+      "NotFound" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/Error"
+            }
+          }
+        },
+        "description" : "Không tìm thấy"
+      },
+      "ValidationError" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/Error"
+            }
+          }
+        },
+        "description" : "Lỗi validate (BR-01/04/07...)"
+      },
+      "StateConflict" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/Error"
+            }
+          }
+        },
+        "description" : "Chuyển trạng thái không hợp lệ (state machine §4.3)"
+      },
+      "VersionOk" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/DocumentVersion"
+            }
+          }
+        },
+        "description" : "OK"
+      },
+      "DefaultError" : {
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/Error"
+            }
+          }
+        },
+        "description" : "Lỗi (client/nghiệp vụ) — xem code trong Error"
+      }
+    },
+    "schemas" : {
+      "DocumentType" : {
+        "enum" : [ "Policy", "Process", "Procedure", "Work Instruction", "Template", "Checklist", "Standard" ],
+        "type" : "string"
+      },
+      "VersionStatus" : {
+        "enum" : [ "Draft", "InReview", "Approved", "Published", "Effective", "Superseded", "Retired" ],
+        "type" : "string"
+      },
+      "FeedbackCategory" : {
+        "enum" : [ "content_error", "unclear", "improvement", "question" ],
+        "type" : "string"
+      },
+      "FeedbackStatus" : {
+        "enum" : [ "New", "Triaged", "InProgress", "Resolved", "Rejected" ],
+        "type" : "string"
+      },
+      "DocumentSummary" : {
+        "example" : {
+          "doc_id" : "doc_id",
+          "title" : "title",
+          "type" : "Policy",
+          "classification" : "classification",
+          "effective_version" : "effective_version",
+          "status" : "Draft",
+          "tags" : [ "tags", "tags" ]
+        },
+        "properties" : {
+          "doc_id" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "$ref" : "#/components/schemas/DocumentType"
+          },
+          "classification" : {
+            "type" : "string"
+          },
+          "effective_version" : {
+            "nullable" : true,
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/VersionStatus"
+          },
+          "tags" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "default" : null
+          }
+        },
+        "required" : [ "doc_id", "effective_version", "status", "title", "type" ]
+      },
+      "Document" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/DocumentSummary"
+        }, {
+          "properties" : {
+            "mandatory_ack" : {
+              "type" : "boolean"
+            },
+            "next_review_date" : {
+              "format" : "date",
+              "nullable" : true,
+              "type" : "string"
+            },
+            "audience_roles" : {
+              "description" : "REC-F-01",
+              "items" : {
+                "type" : "string"
+              },
+              "type" : "array",
+              "default" : null
+            }
+          }
+        } ],
+        "example" : {
+          "doc_id" : "doc_id",
+          "title" : "title",
+          "type" : "Policy",
+          "classification" : "classification",
+          "effective_version" : "effective_version",
+          "status" : "Draft",
+          "tags" : [ "tags", "tags" ],
+          "mandatory_ack" : true,
+          "next_review_date" : "2000-01-23",
+          "audience_roles" : [ "audience_roles", "audience_roles" ]
+        }
+      },
+      "DocumentDetail" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Document"
+        }, {
+          "properties" : {
+            "is_effective" : {
+              "description" : "false → cảnh báo non-Effective (DOC-F-12)",
+              "type" : "boolean"
+            },
+            "badge" : {
+              "description" : "vd Sap ap dung tu 15/07/2026",
+              "nullable" : true,
+              "type" : "string"
+            },
+            "effective_link" : {
+              "description" : "link tới bản Effective nếu đang xem bản khác",
+              "nullable" : true,
+              "type" : "string"
+            },
+            "content_html" : {
+              "description" : "Markdown render (Markdig)",
+              "type" : "string"
+            }
+          }
+        } ],
+        "example" : {
+          "doc_id" : "doc_id",
+          "title" : "title",
+          "type" : "Policy",
+          "classification" : "classification",
+          "effective_version" : "effective_version",
+          "status" : "Draft",
+          "tags" : [ "tags", "tags" ],
+          "mandatory_ack" : true,
+          "next_review_date" : "2000-01-23",
+          "audience_roles" : [ "audience_roles", "audience_roles" ],
+          "is_effective" : true,
+          "badge" : "badge",
+          "effective_link" : "effective_link",
+          "content_html" : "content_html"
+        }
+      },
+      "DocumentVersion" : {
+        "example" : {
+          "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "doc_id" : "doc_id",
+          "version" : "version",
+          "status" : "Draft",
+          "issue_date" : "2000-01-23",
+          "effective_date" : "2000-01-23",
+          "change_summary" : "change_summary",
+          "created_at" : "2000-01-23T04:56:07.000+00:00"
+        },
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "doc_id" : {
+            "type" : "string"
+          },
+          "version" : {
+            "pattern" : "^\\d+\\.\\d+$",
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/VersionStatus"
+          },
+          "issue_date" : {
+            "format" : "date",
+            "nullable" : true,
+            "type" : "string"
+          },
+          "effective_date" : {
+            "format" : "date",
+            "nullable" : true,
+            "type" : "string"
+          },
+          "change_summary" : {
+            "type" : "string"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "doc_id", "id", "status", "version" ]
+      },
+      "CreateDocumentRequest" : {
+        "example" : {
+          "doc_id" : "doc_id",
+          "title" : "title",
+          "type" : "Policy",
+          "classification" : "classification",
+          "mandatory_ack" : false,
+          "next_review_date" : "2000-01-23",
+          "audience_roles" : [ "audience_roles", "audience_roles" ],
+          "tags" : [ "tags", "tags" ],
+          "content_markdown" : "content_markdown"
+        },
+        "properties" : {
+          "doc_id" : {
+            "pattern" : "^[A-Z]{2,}-[A-Z]{2,}-\\d{3,}$",
+            "type" : "string"
+          },
+          "title" : {
+            "maxLength" : 200,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "type" : {
+            "$ref" : "#/components/schemas/DocumentType"
+          },
+          "classification" : {
+            "type" : "string"
+          },
+          "mandatory_ack" : {
+            "default" : false,
+            "type" : "boolean"
+          },
+          "next_review_date" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "audience_roles" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "default" : null
+          },
+          "tags" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array",
+            "default" : null
+          },
+          "content_markdown" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "doc_id", "title", "type" ]
+      },
+      "CreateVersionRequest" : {
+        "example" : {
+          "change_type" : "minor",
+          "content_markdown" : "content_markdown"
+        },
+        "properties" : {
+          "change_type" : {
+            "description" : "BR-05",
+            "enum" : [ "minor", "major" ],
+            "type" : "string"
+          },
+          "content_markdown" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "change_type" ]
+      },
+      "PublishRequest" : {
+        "example" : {
+          "issue_date" : "2000-01-23",
+          "effective_date" : "2000-01-23",
+          "change_summary" : "change_summary"
+        },
+        "properties" : {
+          "issue_date" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "effective_date" : {
+            "description" : "có thể tương lai; >= issue_date (BR-07)",
+            "format" : "date",
+            "type" : "string"
+          },
+          "change_summary" : {
+            "description" : "bắt buộc (BR-04)",
+            "maxLength" : 500,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "change_summary", "effective_date", "issue_date" ]
+      },
+      "PublishResult" : {
+        "example" : {
+          "version_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "doc_id" : "doc_id",
+          "version" : "version",
+          "status" : "Draft",
+          "effective_date" : "2000-01-23",
+          "badge" : "badge"
+        },
+        "properties" : {
+          "version_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "doc_id" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/VersionStatus"
+          },
+          "effective_date" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "badge" : {
+            "nullable" : true,
+            "type" : "string"
+          }
+        }
+      },
+      "Acknowledgement" : {
+        "example" : {
+          "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "version_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "acked_at" : "2000-01-23T04:56:07.000+00:00"
+        },
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "version_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "acked_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }
+      },
+      "Feedback" : {
+        "example" : {
+          "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "version_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "category" : "content_error",
+          "status" : "New",
+          "body" : "body",
+          "created_at" : "2000-01-23T04:56:07.000+00:00"
+        },
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "version_id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "category" : {
+            "$ref" : "#/components/schemas/FeedbackCategory"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/FeedbackStatus"
+          },
+          "body" : {
+            "nullable" : true,
+            "type" : "string"
+          },
+          "created_at" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }
+      },
+      "CreateFeedbackRequest" : {
+        "description" : "Ngữ cảnh (doc_id/version/url) đính kèm; server tự gắn, không tin client cho định danh (FBK-F-04).",
+        "example" : {
+          "doc_id" : "doc_id",
+          "version" : "version",
+          "url" : "url",
+          "category" : "content_error",
+          "body" : "body"
+        },
+        "properties" : {
+          "doc_id" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "category" : {
+            "$ref" : "#/components/schemas/FeedbackCategory"
+          },
+          "body" : {
+            "maxLength" : 2000,
+            "type" : "string"
+          }
+        },
+        "required" : [ "category", "doc_id", "version" ]
+      },
+      "RecommendationItem" : {
+        "example" : {
+          "doc_id" : "doc_id",
+          "version" : "version",
+          "title" : "title",
+          "effective_date" : "2000-01-23",
+          "reason" : "reason"
+        },
+        "properties" : {
+          "doc_id" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "effective_date" : {
+            "format" : "date",
+            "nullable" : true,
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "explainable: bat buoc / can doc lai / khop role / vua cap nhat (BR-11)",
+            "type" : "string"
+          }
+        },
+        "required" : [ "doc_id", "reason", "version" ]
+      },
+      "Recommendations" : {
+        "example" : {
+          "must_read" : [ {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "title" : "title",
+            "effective_date" : "2000-01-23",
+            "reason" : "reason"
+          }, {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "title" : "title",
+            "effective_date" : "2000-01-23",
+            "reason" : "reason"
+          } ],
+          "suggested" : [ {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "title" : "title",
+            "effective_date" : "2000-01-23",
+            "reason" : "reason"
+          }, {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "title" : "title",
+            "effective_date" : "2000-01-23",
+            "reason" : "reason"
+          } ]
+        },
+        "properties" : {
+          "must_read" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RecommendationItem"
+            },
+            "type" : "array",
+            "default" : null
+          },
+          "suggested" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RecommendationItem"
+            },
+            "type" : "array",
+            "default" : null
+          }
+        }
+      },
+      "SearchHit" : {
+        "example" : {
+          "doc_id" : "doc_id",
+          "version" : "version",
+          "title" : "title",
+          "snippet" : "snippet",
+          "score" : 0.8008281904610115
+        },
+        "properties" : {
+          "doc_id" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : "string"
+          },
+          "score" : {
+            "type" : "number"
+          }
+        }
+      },
+      "AuditEntry" : {
+        "example" : {
+          "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "actor" : "actor",
+          "action" : "action",
+          "document_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+          "at" : "2000-01-23T04:56:07.000+00:00"
+        },
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "actor" : {
+            "type" : "string"
+          },
+          "action" : {
+            "type" : "string"
+          },
+          "document_id" : {
+            "format" : "uuid",
+            "nullable" : true,
+            "type" : "string"
+          },
+          "at" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }
+      },
+      "AssistantAnswer" : {
+        "example" : {
+          "status" : "answered",
+          "answer" : "answer",
+          "citations" : [ {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "effective_date" : "2000-01-23",
+            "url" : "url",
+            "snippet" : "snippet"
+          }, {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "effective_date" : "2000-01-23",
+            "url" : "url",
+            "snippet" : "snippet"
+          } ]
+        },
+        "properties" : {
+          "status" : {
+            "description" : "insufficient = \"không chắc\" (BOT-F-04)",
+            "enum" : [ "answered", "insufficient" ],
+            "type" : "string"
+          },
+          "answer" : {
+            "nullable" : true,
+            "type" : "string"
+          },
+          "citations" : {
+            "description" : "bắt buộc khi answered (BOT-F-03)",
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantAnswer_citations_inner"
+            },
+            "type" : "array",
+            "default" : null
+          }
+        },
+        "required" : [ "status" ]
+      },
+      "Page" : {
+        "properties" : {
+          "next_cursor" : {
+            "nullable" : true,
+            "type" : "string"
+          }
+        }
+      },
+      "Error" : {
+        "example" : {
+          "error" : {
+            "code" : "code",
+            "message" : "message",
+            "details" : {
+              "key" : ""
+            }
+          }
+        },
+        "properties" : {
+          "error" : {
+            "$ref" : "#/components/schemas/Error_error"
+          }
+        },
+        "required" : [ "error" ]
+      },
+      "listDocuments_200_response" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Page"
+        }, {
+          "properties" : {
+            "data" : {
+              "items" : {
+                "$ref" : "#/components/schemas/DocumentSummary"
+              },
+              "type" : "array",
+              "default" : null
+            }
+          }
+        } ],
+        "example" : {
+          "next_cursor" : "next_cursor",
+          "data" : [ {
+            "doc_id" : "doc_id",
+            "title" : "title",
+            "type" : "Policy",
+            "classification" : "classification",
+            "effective_version" : "effective_version",
+            "status" : "Draft",
+            "tags" : [ "tags", "tags" ]
+          }, {
+            "doc_id" : "doc_id",
+            "title" : "title",
+            "type" : "Policy",
+            "classification" : "classification",
+            "effective_version" : "effective_version",
+            "status" : "Draft",
+            "tags" : [ "tags", "tags" ]
+          } ]
+        }
+      },
+      "getDiff_200_response" : {
+        "example" : {
+          "from" : "from",
+          "to" : "to",
+          "diff" : "diff",
+          "change_summary" : "change_summary"
+        },
+        "properties" : {
+          "from" : {
+            "type" : "string"
+          },
+          "to" : {
+            "type" : "string"
+          },
+          "diff" : {
+            "description" : "unified diff nội dung",
+            "type" : "string"
+          },
+          "change_summary" : {
+            "type" : "string"
+          }
+        }
+      },
+      "approveVersion_request" : {
+        "properties" : {
+          "decision" : {
+            "enum" : [ "approve", "reject" ],
+            "type" : "string"
+          },
+          "comment" : {
+            "description" : "bắt buộc khi reject",
+            "maxLength" : 1000,
+            "type" : "string"
+          }
+        },
+        "required" : [ "decision" ]
+      },
+      "search_200_response" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Page"
+        }, {
+          "properties" : {
+            "data" : {
+              "items" : {
+                "$ref" : "#/components/schemas/SearchHit"
+              },
+              "type" : "array",
+              "default" : null
+            }
+          }
+        } ],
+        "example" : {
+          "next_cursor" : "next_cursor",
+          "data" : [ {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "title" : "title",
+            "snippet" : "snippet",
+            "score" : 0.8008281904610115
+          }, {
+            "doc_id" : "doc_id",
+            "version" : "version",
+            "title" : "title",
+            "snippet" : "snippet",
+            "score" : 0.8008281904610115
+          } ]
+        }
+      },
+      "triageFeedback_request" : {
+        "properties" : {
+          "status" : {
+            "$ref" : "#/components/schemas/FeedbackStatus"
+          },
+          "note" : {
+            "maxLength" : 1000,
+            "type" : "string"
+          }
+        },
+        "required" : [ "status" ]
+      },
+      "listAudit_200_response" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Page"
+        }, {
+          "properties" : {
+            "data" : {
+              "items" : {
+                "$ref" : "#/components/schemas/AuditEntry"
+              },
+              "type" : "array",
+              "default" : null
+            }
+          }
+        } ],
+        "example" : {
+          "next_cursor" : "next_cursor",
+          "data" : [ {
+            "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+            "actor" : "actor",
+            "action" : "action",
+            "document_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+            "at" : "2000-01-23T04:56:07.000+00:00"
+          }, {
+            "id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+            "actor" : "actor",
+            "action" : "action",
+            "document_id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
+            "at" : "2000-01-23T04:56:07.000+00:00"
+          } ]
+        }
+      },
+      "askAssistant_request" : {
+        "properties" : {
+          "question" : {
+            "maxLength" : 2000,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "lang" : {
+            "default" : "vi",
+            "enum" : [ "vi", "en" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "question" ]
+      },
+      "AssistantAnswer_citations_inner" : {
+        "example" : {
+          "doc_id" : "doc_id",
+          "version" : "version",
+          "effective_date" : "2000-01-23",
+          "url" : "url",
+          "snippet" : "snippet"
+        },
+        "properties" : {
+          "doc_id" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "effective_date" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Error_error" : {
+        "example" : {
+          "code" : "code",
+          "message" : "message",
+          "details" : {
+            "key" : ""
+          }
+        },
+        "properties" : {
+          "code" : {
+            "description" : "mã lỗi theo ISC Error Code catalog",
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "details" : {
+            "additionalProperties" : true,
+            "nullable" : true,
+            "type" : "object"
+          }
+        },
+        "required" : [ "code", "message" ]
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "bearerFormat" : "JWT",
+        "description" : "OIDC access token từ SSO nội bộ (ADM-F-05, NFR-04)",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  }
+}

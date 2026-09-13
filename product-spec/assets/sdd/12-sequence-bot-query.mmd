@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor U as Reader
+  participant API as qgp-api
+  participant RAG as qgp-rag (Python)
+  participant DB as Postgres+pgvector
+  participant LLM as LLM API
+  U->>API: POST /assistant/query
+  API->>RAG: POST /v1/query (question)
+  RAG->>DB: vector retrieval (chỉ Effective)
+  alt đủ căn cứ
+    RAG->>LLM: prompt + context
+    LLM-->>RAG: answer
+    RAG-->>API: answered + citations (BOT-F-03)
+  else không đủ
+    RAG-->>API: insufficient + log (BOT-F-04/06)
+  end
+  API->>API: verify citations != rỗng (defense-in-depth)
+  API-->>U: answer | "không chắc"

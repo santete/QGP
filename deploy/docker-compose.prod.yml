@@ -1,0 +1,100 @@
+# QGP full stack đóng gói (A3+A4, ADR-0011). Chạy:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
+# Xem biến cần set ở deploy/.env.prod.example.
+name: qgp-prod
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qgp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-qgp_db}
+    volumes:
+      - qgp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qgp} -d ${POSTGRES_DB:-qgp_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY}
+    volumes:
+      - qgp_meilidata:/meili_data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - qgp_redisdata:/data
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    # Prod thật nên dùng DB ngoài (KC_DB) + hostname cố định; đây là bản gọn cho staging.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-qgp.json:/opt/keycloak/data/import/realm-qgp.json:ro
+    ports:
+      - "${KEYCLOAK_PORT:-8081}:8080"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      QGP_DB_CONNECTION: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-qgp_db};Username=${POSTGRES_USER:-qgp};Password=${POSTGRES_PASSWORD}"
+      QGP_MEILI_KEY: ${MEILI_MASTER_KEY}
+      Meili__Url: "http://meilisearch:7700"
+      Auth__Mode: Oidc
+      Auth__OidcAuthority: ${OIDC_AUTHORITY:?set OIDC_AUTHORITY}
+      Auth__RequireHttpsMetadata: ${OIDC_REQUIRE_HTTPS:-true}
+      Auth__Audience: ${OIDC_AUDIENCE:-qgp-api}
+      Cors__AllowedOrigins: ${CORS_ALLOWED_ORIGINS:?set CORS_ALLOWED_ORIGINS}
+      Otel__OtlpEndpoint: ${OTEL_OTLP_ENDPOINT:-}   # rỗng = tắt observability (ISC.Observability)
+    volumes:
+      - qgp_content:/data/content-repo
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /v1
+        VITE_USE_MOCK: "0"
+        VITE_OIDC_AUTHORITY: ${OIDC_AUTHORITY}
+        VITE_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-qgp-web}
+    depends_on:
+      - api
+    ports:
+      - "${WEB_HTTP_PORT:-80}:80"
+      - "${WEB_HTTPS_PORT:-443}:443"
+    # TLS: mount cert khi bật block 443 trong nginx.conf.
+    # volumes:
+    #   - ./certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+
+volumes:
+  qgp_pgdata:
+  qgp_meilidata:
+  qgp_redisdata:
+  qgp_content:

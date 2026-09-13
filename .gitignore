@@ -1,0 +1,4 @@
+
+# QGP Git content store (nội dung tài liệu — dùng volume ở prod, KHÔNG commit vào repo project)
+content-repo/
+**/content-repo/

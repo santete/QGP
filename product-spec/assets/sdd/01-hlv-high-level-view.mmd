@@ -1,0 +1,36 @@
+flowchart TB
+  subgraph Users["Người dùng nội bộ FPT ISC"]
+    R["Reader / New joiner"]
+    A["Author / Approver"]
+    Q["QA Governance Lead / Admin"]
+  end
+  subgraph QGP["QGP Platform"]
+    UI["Web UI (React)"]
+    subgraph CAP["Năng lực (qgp-api)"]
+      DOC["DOC — Tài liệu & version"]
+      KB["KB — Wiki/Knowledge"]
+      FBK["FBK — Feedback"]
+      REC["REC — Gợi ý theo role"]
+      ONB["ONB — Onboarding"]
+      RPT["RPT — Báo cáo"]
+      ADM["ADM — RBAC/Audit"]
+      BOT["BOT — Trợ lý AI (P3)"]
+    end
+  end
+  subgraph EXT["Ngoài phạm vi / hệ thống ngoài"]
+    SSO["SSO nội bộ (OIDC)"]
+    LLM["LLM API (P3)"]
+  end
+  R --> UI
+  A --> UI
+  Q --> UI
+  UI --> DOC
+  UI --> KB
+  UI --> FBK
+  UI --> REC
+  UI --> ONB
+  UI --> RPT
+  UI --> ADM
+  UI --> BOT
+  QGP --> SSO
+  BOT --> LLM

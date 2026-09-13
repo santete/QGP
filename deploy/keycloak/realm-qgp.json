@@ -1,0 +1,110 @@
+{
+  "realm": "qgp",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "reader", "description": "QGP READER — đọc tài liệu Effective" },
+      { "name": "contributor", "description": "QGP CONTRIBUTOR — đóng góp KB" },
+      { "name": "author", "description": "QGP AUTHOR — soạn/sửa DOC" },
+      { "name": "approver", "description": "QGP APPROVER — duyệt DOC" },
+      { "name": "qa_lead", "description": "QGP QA_LEAD — cấu hình/audit" },
+      { "name": "admin", "description": "QGP ADMIN — quản trị hệ thống" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "qgp-api",
+      "name": "QGP API (resource server)",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "qgp-web",
+      "name": "QGP Web (SPA)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect",
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "http://localhost:5173",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "qgp-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "qgp-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "reader1",
+      "enabled": true,
+      "email": "reader1@qgp.local",
+      "emailVerified": true,
+      "firstName": "Reader",
+      "lastName": "One",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["reader"]
+    },
+    {
+      "username": "author1",
+      "enabled": true,
+      "email": "author1@qgp.local",
+      "emailVerified": true,
+      "firstName": "Author",
+      "lastName": "One",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["author", "reader"]
+    },
+    {
+      "username": "approver1",
+      "enabled": true,
+      "email": "approver1@qgp.local",
+      "emailVerified": true,
+      "firstName": "Approver",
+      "lastName": "One",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["approver", "reader"]
+    },
+    {
+      "username": "qalead1",
+      "enabled": true,
+      "email": "qalead1@qgp.local",
+      "emailVerified": true,
+      "firstName": "QA",
+      "lastName": "Lead",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["qa_lead", "reader"]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "email": "admin1@qgp.local",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "One",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["admin", "qa_lead", "reader"]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: var(--font-primary);
+    font-feature-settings: 'cv11', 'ss01';
+    color: var(--color-text-primary);
+    background: var(--color-bg-neutral);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Markdown content render (content_html từ server, đã sanitize) */
+@layer components {
+  .doc-prose {
+    color: var(--color-text-primary);
+    line-height: 1.7;
+  }
+  .doc-prose h1,
+  .doc-prose h2,
+  .doc-prose h3 {
+    font-weight: 700;
+    margin: 1.5em 0 0.5em;
+    line-height: 1.4;
+  }
+  .doc-prose h1 { font-size: 1.75rem; }
+  .doc-prose h2 { font-size: 1.375rem; }
+  .doc-prose h3 { font-size: 1.125rem; }
+  .doc-prose p { margin: 0.75em 0; }
+  .doc-prose ul,
+  .doc-prose ol { margin: 0.75em 0; padding-left: 1.5em; }
+  .doc-prose li { margin: 0.25em 0; }
+  .doc-prose a { color: var(--color-primary-main); text-decoration: underline; }
+  .doc-prose code {
+    background: var(--color-bg-neutral);
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-xs);
+    font-size: 0.875em;
+  }
+  .doc-prose pre {
+    background: var(--color-grey-800);
+    color: #fff;
+    padding: 1em;
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+  }
+  .doc-prose pre code { background: transparent; padding: 0; }
+  .doc-prose table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  .doc-prose th,
+  .doc-prose td {
+    border-bottom: 1px dashed var(--color-divider-dashed);
+    padding: 0.5em 0.75em;
+    text-align: left;
+  }
+  .doc-prose blockquote {
+    border-left: 3px solid var(--color-primary-main);
+    padding-left: 1em;
+    color: var(--color-text-secondary);
+    margin: 1em 0;
+  }
+}

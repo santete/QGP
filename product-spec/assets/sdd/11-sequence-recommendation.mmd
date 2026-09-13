@@ -1,0 +1,14 @@
+sequenceDiagram
+  actor U as Reader
+  participant API as qgp-api
+  participant R as Redis
+  participant DB as Postgres
+  U->>API: GET /recommendations
+  API->>R: cache per-user (TTL 5m)?
+  alt cache miss
+    API->>DB: role + audience_roles + ack status
+    API->>DB: docs Effective khớp role, trong quyền đọc (BR-11)
+    API->>API: xếp bucket (bắt buộc>đọc lại>relevant>mới)
+    API->>R: set cache 5m
+  end
+  API-->>U: must_read + suggested (kèm reason)

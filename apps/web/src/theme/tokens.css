@@ -1,0 +1,125 @@
+/* =============================================================
+   QGP Design Tokens — synced from Claude Design "Minimal UI"
+   Source of truth: colors_and_type.css (project Minimal UI Design System).
+   DO NOT hand-edit token values here — re-sync from design instead.
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* ===== BRAND PALETTE ============================== */
+  --color-primary-lighter: #C8FAD6;
+  --color-primary-light:   #5BE49B;
+  --color-primary-main:    #00A76F;
+  --color-primary-dark:    #007867;
+  --color-primary-darker:  #004B50;
+  --color-primary-contrast:#FFFFFF;
+
+  --color-secondary-lighter: #EFD6FF;
+  --color-secondary-light:   #C684FF;
+  --color-secondary-main:    #8E33FF;
+  --color-secondary-dark:    #5119B7;
+  --color-secondary-darker:  #27097A;
+  --color-secondary-contrast:#FFFFFF;
+
+  --color-info-lighter: #CAFDF5;
+  --color-info-light:   #61F3F3;
+  --color-info-main:    #00B8D9;
+  --color-info-dark:    #006C9C;
+  --color-info-darker:  #003768;
+  --color-info-contrast:#FFFFFF;
+
+  --color-success-lighter: #D3FCD2;
+  --color-success-light:   #77ED8B;
+  --color-success-main:    #22C55E;
+  --color-success-dark:    #118D57;
+  --color-success-darker:  #065E49;
+  --color-success-contrast:#FFFFFF;
+
+  --color-warning-lighter: #FFF5CC;
+  --color-warning-light:   #FFD666;
+  --color-warning-main:    #FFAB00;
+  --color-warning-dark:    #B76E00;
+  --color-warning-darker:  #7A4100;
+  --color-warning-contrast:#1C252E;
+
+  --color-error-lighter: #FFE9D5;
+  --color-error-light:   #FFAC82;
+  --color-error-main:    #FF5630;
+  --color-error-dark:    #B71D18;
+  --color-error-darker:  #7A0916;
+  --color-error-contrast:#FFFFFF;
+
+  --color-grey-100: #F9FAFB;
+  --color-grey-200: #F4F6F8;
+  --color-grey-300: #DFE3E8;
+  --color-grey-400: #C4CDD5;
+  --color-grey-500: #919EAB;
+  --color-grey-600: #637381;
+  --color-grey-700: #454F5B;
+  --color-grey-800: #1C252E;
+  --color-grey-900: #141A21;
+
+  /* ===== SEMANTIC ==================================== */
+  --color-text-primary:   #1C252E;
+  --color-text-secondary: #637381;
+  --color-text-disabled:  #919EAB;
+  --color-bg-default:     #FFFFFF;
+  --color-bg-paper:       #FFFFFF;
+  --color-bg-neutral:     #F4F6F8;
+  --color-divider:        rgba(145,158,171,0.2);
+  --color-divider-dashed: rgba(145,158,171,0.32);
+
+  --color-action-hover:       rgba(145,158,171,0.08);
+  --color-action-selected:    rgba(145,158,171,0.16);
+  --color-action-disabled:    rgba(145,158,171,0.80);
+  --color-action-disabled-bg: rgba(145,158,171,0.24);
+  --color-action-focus:       rgba(145,158,171,0.24);
+
+  /* ===== SHADOWS (grey-500 based, never black) ====== */
+  --shadow-card:     0 0 2px 0 rgba(145,158,171,0.20), 0 12px 24px -4px rgba(145,158,171,0.12);
+  --shadow-dropdown: 0 0 2px 0 rgba(145,158,171,0.24), -20px 20px 40px -4px rgba(145,158,171,0.24);
+  --shadow-dialog:   -40px 40px 80px -8px rgba(145,158,171,0.24);
+  --shadow-primary:  0 8px 16px 0 rgba(0,167,111,0.24);
+
+  /* ===== RADII ====================================== */
+  --radius-xs:  4px;
+  --radius-sm:  6px;
+  --radius-md:  8px;   /* button, input */
+  --radius-lg:  12px;
+  --radius-xl:  16px;  /* card, dialog */
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* ===== SPACING (8-base) =========================== */
+  --space-0_5: 4px;  --space-1: 8px;  --space-1_5: 12px; --space-2: 16px;
+  --space-2_5: 20px; --space-3: 24px; --space-4: 32px;   --space-5: 40px;
+  --space-6: 48px;   --space-8: 64px; --space-10: 80px;  --space-15: 120px;
+
+  /* ===== LAYOUT ===================================== */
+  --container-lg: 1200px;  --container-xl: 1440px;
+  --sidebar-mini: 88px;    --sidebar-full: 280px;
+  --header-mobile: 64px;   --header-desktop: 80px;
+
+  /* ===== MOTION ===================================== */
+  --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-hover: 180ms; --duration-modal: 260ms; --duration-page: 400ms;
+
+  /* ===== TYPOGRAPHY ================================= */
+  --font-primary: 'Inter', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ===== DARK MODE ==================================== */
+[data-theme="dark"] {
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #919EAB;
+  --color-text-disabled:  #637381;
+  --color-bg-default:     #141A21;
+  --color-bg-paper:       #1C252E;
+  --color-bg-neutral:     rgba(145,158,171,0.12);
+  --color-divider:        rgba(145,158,171,0.2);
+
+  --shadow-card:     0 0 2px 0 rgba(0,0,0,0.20), 0 12px 24px -4px rgba(0,0,0,0.24);
+  --shadow-dropdown: 0 0 2px 0 rgba(0,0,0,0.24), -20px 20px 40px -4px rgba(0,0,0,0.24);
+  --shadow-dialog:   -40px 40px 80px -8px rgba(0,0,0,0.24);
+}

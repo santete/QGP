@@ -1,0 +1,10 @@
+flowchart LR
+  ed["Author soạn Markdown"] --> git["Git commit (content_git_ref)"]
+  git --> pub["publish + effective (scheduler)"]
+  pub --> meta["Postgres: version=Effective"]
+  pub --> idxjob["Re-index job"]
+  idxjob --> meili["Meilisearch (full-text)"]
+  idxjob --> ragup["qgp-rag /index/upsert (P3)"]
+  ragup --> vec["pgvector embeddings"]
+  meili --> search["GET /search < 1s"]
+  vec --> bot["POST /assistant/query"]

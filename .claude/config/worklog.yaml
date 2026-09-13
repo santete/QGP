@@ -1,0 +1,29 @@
+# Worklog Manager — config (đọc bởi /worklog, /worklog-sync)
+# Portable: copy cả bộ (config + skill + command) sang project khác, chỉ sửa file này.
+
+# ── Obsidian vault ────────────────────────────────────────────────
+# Đường dẫn TUYỆT ĐỐI tới vault (CHÚ Ý: đúng vault, tránh nhầm 2 folder gần tên nhau).
+vault_path: "C:/Users/nangh/Documents/ObsidianVault"
+
+# ── Dự án ─────────────────────────────────────────────────────────
+project: "QGP"                 # tên ngắn → folder + tag + hub note
+author: "phucdn7"
+
+# ── Cấu trúc trong vault (placeholder: {project}, {date}) ─────────
+project_folder: "projects/{project}"     # chứa hub MOC + các worklog
+hub_note: "{project}"                     # note hub (MOC) — vd projects/QGP/QGP.md
+worklog_name: "Worklog-{date}"            # 1 note / ngày — vd Worklog-2026-07-25.md
+index_note: "wiki/Index.md"               # MOC gốc vault (thêm dòng dự án nếu chưa có)
+date_format: "%Y-%m-%d"
+
+# ── Định dạng Obsidian ────────────────────────────────────────────
+use_callouts: true             # [!abstract]/[!note]/[!warning]/[!tip] cho TL;DR/decision/gotcha
+use_dataview: true             # hub auto-list worklog bằng Dataview
+frontmatter_type: "worklog"    # type: worklog (để Dataview lọc)
+base_tags: [worklog]           # tag mặc định; tag <project> (lowercase) tự thêm
+
+# ── Nguồn gom việc (Claude tự đọc khi /worklog) ──────────────────
+sources:
+  git_diff: true                                   # git diff --name-only HEAD
+  project_state: ".claude/memory/project_state.yaml"  # last_task/decisions/gotchas
+  ask_user_summary: true                           # hỏi 1 câu tóm tắt nếu thiếu context

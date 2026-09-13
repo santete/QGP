@@ -1,0 +1,29 @@
+flowchart TB
+  person["[Person] Người dùng nội bộ"]
+  subgraph boundary["QGP — System boundary"]
+    web["[Container] Web UI<br/>React + Vite + TS"]
+    nginx["[Container] Reverse proxy<br/>Nginx + TLS"]
+    api["[Container] qgp-api<br/>.NET 8 ASP.NET Core"]
+    sch["[Container] Scheduler<br/>Quartz.NET (HostedService)"]
+    rag["[Container] qgp-rag<br/>Python FastAPI + LlamaIndex (P3)"]
+    db[("[Container] PostgreSQL 16<br/>+ pgvector")]
+    idx[("[Container] Meilisearch")]
+    cache[("[Container] Redis")]
+    git[("[Container] Git repo (GitLab)")]
+  end
+  sso["[External] SSO (OIDC)"]
+  llm["[External] LLM API (P3)"]
+
+  person -->|"HTTPS"| nginx
+  nginx -->|"HTTP nội bộ"| web
+  web -->|"REST /v1 [JSON/HTTPS]"| api
+  api -->|"OIDC token introspection"| sso
+  api -->|"nội dung Markdown [git/HTTPS]"| git
+  api -->|"SQL [TCP 5432]"| db
+  api -->|"index/search [HTTP]"| idx
+  api -->|"cache/idempotency [RESP]"| cache
+  api -->|"query/index [REST nội bộ]"| rag
+  sch -->|"đổi trạng thái, re-index"| db
+  sch -->|"re-index Effective"| idx
+  rag -->|"vector search [SQL]"| db
+  rag -->|"sinh câu trả lời [HTTPS]"| llm

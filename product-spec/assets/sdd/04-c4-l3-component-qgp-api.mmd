@@ -1,0 +1,36 @@
+flowchart TB
+  subgraph api["qgp-api (.NET 8)"]
+    ctl["Controllers /v1<br/>(sinh từ OpenAPI)"]
+    authz["AuthZ / RBAC<br/>(policy theo §10.1 PRD)"]
+    docsvc["DocumentService"]
+    versvc["VersionService<br/>(state machine WF-01)"]
+    appsvc["ApprovalService"]
+    recsvc["RecommendationEngine<br/>(rules-based, BR-11)"]
+    fbksvc["FeedbackService"]
+    searchgw["SearchGateway"]
+    raggw["RagGateway<br/>(client qgp-rag)"]
+    audit["AuditService"]
+    repo["Repositories (EF Core)"]
+  end
+  db[("Postgres")]
+  idx[("Meilisearch")]
+  rag["qgp-rag (Python)"]
+
+  ctl --> authz
+  authz --> docsvc
+  authz --> versvc
+  authz --> appsvc
+  authz --> recsvc
+  authz --> fbksvc
+  docsvc --> repo
+  versvc --> repo
+  appsvc --> repo
+  recsvc --> repo
+  fbksvc --> repo
+  versvc --> audit
+  appsvc --> audit
+  recsvc --> searchgw
+  searchgw --> idx
+  raggw --> rag
+  repo --> db
+  audit --> repo

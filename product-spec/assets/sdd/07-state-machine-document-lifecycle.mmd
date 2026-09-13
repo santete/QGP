@@ -1,0 +1,13 @@
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> InReview: submit
+  InReview --> Approved: approve
+  InReview --> Draft: reject
+  Approved --> Published: publish
+  Published --> Effective: effective_date reached
+  Effective --> UnderRevision: start revision
+  UnderRevision --> Effective: minor re-publish
+  UnderRevision --> InReview: major submit
+  Effective --> Superseded: superseded by new
+  Superseded --> Retired: retention expired
+  Retired --> [*]

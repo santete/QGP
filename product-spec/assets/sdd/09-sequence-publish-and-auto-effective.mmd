@@ -1,0 +1,16 @@
+sequenceDiagram
+  actor A as Author
+  participant API as qgp-api
+  participant DB as Postgres
+  participant SCH as Scheduler
+  participant IDX as Meilisearch
+  participant RAG as qgp-rag
+  A->>API: POST /versions/{id}/publish
+  API->>API: validate change_summary + ngay hop le (BR-04, BR-07)
+  API->>DB: status=Published, lưu ngày + change_summary
+  API-->>A: 200 Published + badge Sap ap dung
+  Note over SCH: job hằng ngày (idempotent)
+  SCH->>DB: tim ban Published da toi ngay ap dung
+  SCH->>DB: set Effective va supersede bản cũ (BR-02)
+  SCH->>IDX: re-index bản Effective
+  SCH->>RAG: POST /index/upsert (P3)

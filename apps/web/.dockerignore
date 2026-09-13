@@ -1,0 +1,8 @@
+node_modules
+dist
+.env.development
+.env.real
+.env.oidc
+.env.local
+*.log
+.vscode

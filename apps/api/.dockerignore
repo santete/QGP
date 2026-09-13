@@ -1,0 +1,7 @@
+**/bin
+**/obj
+tests
+content-repo
+**/*.user
+**/appsettings.Development.json
+.vs

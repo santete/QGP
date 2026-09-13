@@ -1,0 +1,11 @@
+name: worklog
+description: "Obsidian worklog format — frontmatter chuẩn, callouts, wikilinks, Dataview-ready. Chuyển session work → note nhật ký dự án trong vault."
+path: .claude/skills/worklog/
+load_when:
+  - command=/worklog
+  - command=/worklog-sync
+  - task_touches=documentation
+source: "Đúc kết từ pattern quản trị worklog QGP (2026-07-25) + convention vault Obsidian của user"
+tags: [worklog, obsidian, documentation, knowledge-management]
+config: .claude/config/worklog.yaml
+template: .claude/skills/worklog/templates/worklog.md

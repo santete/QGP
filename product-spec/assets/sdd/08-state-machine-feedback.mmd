@@ -1,0 +1,9 @@
+stateDiagram-v2
+  [*] --> New
+  New --> Triaged: QA tiếp nhận
+  Triaged --> InProgress: xử lý
+  InProgress --> Resolved: hoàn tất
+  Triaged --> Rejected: không hợp lệ
+  InProgress --> Rejected: không hợp lệ
+  Resolved --> [*]
+  Rejected --> [*]

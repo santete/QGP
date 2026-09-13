@@ -1,0 +1,388 @@
+# Project State — đọc Phase 0, ghi Phase 5
+# Đây là L2 memory: thay đổi sau mỗi session
+# Tham khảo: guides/memory-system.md
+
+# ── Pattern (set bởi /classify, đừng sửa tay) ──────────────────────
+pattern: A                          # A | B | C
+classified_at: "YYYY-MM-DD"
+loc_at_classification: 0
+next_review_threshold: 12000        # /classify lại khi LOC vượt số này
+team_size: 1
+
+# ── Identity ────────────────────────────────────────────────────────
+project_name: "Quality Governance Portal (QGP)"
+stack: "FE: React+Vite+TS (Minimal UI, Tailwind) · BE: .NET 8 ASP.NET Core · PostgreSQL 16 (+pgvector) · Meilisearch · Redis · RAG Python (P3)"
+description: "Platform docs-as-code quản trị tài liệu quy trình QA (PRD/SDD/ADR ở product-spec/). Đang build FE monorepo apps/web."
+
+# ── Last task classification (6D — set bởi /classify-task hoặc Phase 1 step 1)
+last_task_classification: {}
+# last_task_classification:
+#   date: "2026-06-11"
+#   task: "Add search by SP code"
+#   D1: new-develop
+#   D2: M
+#   D3: single-session
+#   D4: solo
+#   D5: clear
+#   D6: known-subsystem
+#   execution_mode: 2a-subagent
+#   pre_action: none
+
+# ── WISC Gates (Tier 3 Governance — computed by wisc-state.py after /classify-task)
+# Hook wisc-gate.py đọc section này để enforce. wisc-satisfy.py auto-flip khi artifact tạo.
+# wisc-bypass.py xử lý bypass có audit trail. /wisc-audit query lịch sử.
+# Status lifecycle: inactive → required → satisfied | bypassed
+wisc_gates: {}
+# wisc_gates:
+#   WRITE:
+#     status: required              # inactive | required | satisfied | bypassed
+#     artifact: "spec.md"           # file phải tồn tại để satisfy
+#     satisfied_at: ""              # timestamp khi gate satisfied
+#     satisfied_by: ""              # auto (file detected) | manual | bypass | structural
+#     bypass_reason: ""             # ghi lý do nếu user approve bypass (via /wisc-bypass)
+#   ISOLATE:
+#     status: required
+#     artifact: ".claude/memory/scout_report_SP456.md"
+#     satisfied_at: ""
+#     satisfied_by: ""
+#     bypass_reason: ""
+#   SELECT:
+#     status: satisfied             # luôn satisfied (structural enforcement)
+#     artifact: ""
+#     satisfied_at: "2026-06-15T10:00:00"
+#     satisfied_by: structural
+#     bypass_reason: ""
+#   COMPRESS:
+#     status: inactive              # wisc-gate.py check real-time token count
+#     artifact: ""
+#     satisfied_at: ""
+#     satisfied_by: ""
+#     bypass_reason: ""
+
+# ── Sprint / current state ─────────────────────────────────────────
+current_sprint: "✅ NHÓM B (gap nghiệp vụ) DONE (2026-07-26): B0 projection user/role · B2 review-cycle reminders DOC-F-08 · B1 Admin/S17 ĐẦY ĐỦ (BE admin/rbac read + admin/users + tags CRUD + doc audience + doc-types CHIỀU SÂU [Type enum→string] · FE AdminPage /admin 4 tab). BE 67/67 · FE 43/43 · build OK · openapi Redocly valid. Follow-up nhỏ (task b1c1): màn sửa audience per-document (BE + test XONG, đặt UI ở DocumentPage). || Còn lại roadmap: ops go-live nhỏ (CSP nginx, ef migrate deploy, Vault thật, deploy OTel collector/Grafana) · Phase 3 (RAG/BOT S18, value-add). || 🚀 Deployment go-live: ✅ TOÀN BỘ NHÓM A DONE (2026-07-26) — A1 Auth · A3+A4 đóng gói · A5+A6+A7 (bảo mật + secrets + backup + OTel). A7-OTel wire bằng ISC.Observability 1.2.2 (SDK FPT) — VERIFY thật: traces/logs/TraceId chạy, envelope ADR-0014 giữ nguyên. Tiếp theo: B1+B2 (Admin RBAC UI S17 + review-cycle reminders) · việc nhỏ go-live (CSP nginx, ef migrate deploy, Keycloak hardening, Vault thật, deploy Grafana/collector). || Phase 3 (RAG/BOT S18) = value-add, không chặn go-live."
+last_successful_task: "B1 Admin/S17 ĐẦY ĐỦ (2026-07-26): BE + FE quản trị S17. (1) AdminService (Application/AdminService.cs): GetRbacAsync (ma trận §10.1 read-only từ QgpPolicies.RolesFor + roles DB) · ListUsersAsync (user + role từ lớp chiếu B0) · Tags CRUD (slug unique TAG_SLUG_CONFLICT, xoá chặn TAG_IN_USE) · DocTypes CRUD. (2) Audience: DocumentService.Get/SetAudienceAsync (reconcile tránh xoá+chèn cùng PK, validate role code, audit 'document.audience_updated'). (3) DOC-TYPES CHIỀU SÂU (rủi ro cao, xanh sạch): entity DocType (Domain/Entities/DocType.cs code/label/seq/active) + bảng doc_types (seed 7, code==label==giá trị wire, Guid 2222..2201-07); Document.Type enum DocumentType → STRING (=doc_types.code); XOÁ Domain/Enums/DocumentType.cs + Mapping.DocType{To,From}Wire; DocumentService.CreateAsync validate type theo doc_types active (thay Mapping.DocTypeFromWire); sửa SearchService(Build)/ReportService(byType groupBy string)/DevDataSeeder(\"Process\"); migration AddDocTypes (AlterColumn type 30→50 + InsertData 7 + Sql data-fix 'WorkInstruction'→'Work Instruction', Down đảo lại) — đã dotnet ef database update. (4) Endpoints V1Endpoints.cs [AdminConfig]: GET /admin/rbac · GET /admin/users · GET|POST /admin/tags + PATCH|DELETE /admin/tags/{id} · GET /doc-types (active, doc.read) · GET|POST /admin/doc-types + PATCH|DELETE /admin/doc-types/{id} · GET|PUT /documents/{docId}/audience. (5) FE: types.ts local interface (RbacMatrix/AdminUser/AdminTag/AdminDocType/DocAudienceItem — openapi loose) + client.ts 13 hàm (+mock.ts) + AdminPage.tsx 4 tab (RBAC ma trận read-only · Users · Tags CRUD · DocTypes CRUD+toggle active) — router/nav /admin đã có sẵn (T6). (6) openapi.yaml +tag Admin +8 path (loose additionalProperties) + schema_snapshot (doc_types, admin_s17, documents.type=string). VERIFY: BE 67/67 (+AdminApiTests 3, DocAudienceTests 2, DocTypesTests 3) · FE 43/43 (+AdminPage.test) · typecheck + vite build OK · Redocly valid. GOTCHA: OpenAPI 3.1 KHÔNG có 'nullable' (dùng type array) + mỗi operation cần ≥1 4xx (Redocly). HOÃN: màn sửa audience per-doc (task b1c1, BE xong). || Trước: B0 projection + B2 review-cycle reminders (2026-07-26): B0 — UserProvisioningService.SyncAsync (Application/UserProvisioningService.cs): upsert users theo sso_subject (INSERT…ON CONFLICT + COALESCE display_name/email không xoá bằng null) + RECONCILE user_roles khớp đúng bộ claim 'role' (mirror: thêm role mới, GỠ role cũ; role code lạ bỏ qua). Gọi ở GET /me (AuthEndpoints.cs) — FE hit lúc login → DB CHIẾU Keycloak để B1 (xem user/role) + B2 (gửi thông báo QA_LEAD/ADMIN) có dữ liệu ở prod. QUAN TRỌNG: authz VẪN đọc từ token (Keycloak nguồn sự thật, tôn trọng A1a) — /me giờ chạm DB (trước đây pure), response {sub,roles} KHÔNG đổi. Hạn chế: chỉ user từng login mới có trong DB (tự lành dần). B2 — ReviewReminderService.RunAsync(asOf) (Application/ReviewReminderService.cs, DOC-F-08 'chống tài liệu chết già'): quét documents.next_review_date <= asOf+LeadDaysWarn(30) → sinh Notification cho user role QA_LEAD/ADMIN (từ user_roles, cần B0); type doc_review_due (≤30d) / doc_review_overdue (<asOf); title tiếng Việt kèm ngày. Dedupe: bỏ qua (doc,type) đã có notif cùng loại trong leadDays ngày gần nhất (chống spam mỗi ngày). ReviewReminderJob (Infrastructure/Scheduling, Quartz [DisallowConcurrentExecution] StartNow + daily 86400s, gated OFF ở Testing như EffectiveTransitionJob — test gọi service trực tiếp). Config appsettings: Review:LeadDaysWarn=30, Scheduler:ReviewReminderIntervalSeconds=86400. DI cả 2 service trong Program.cs. VERIFY: BE 59/59 (56+2 B0 UserProvisioningTests + 1 B2 ReviewReminderTests), build 0 warning, IPv4 Host=127.0.0.1. B1 CÒN LẠI (task lớn, xem task_tracker). || Trước: A7-OTel wiring bằng ISC.Observability 1.2.2 (2026-07-26): SDK observability nội bộ FPT (owner sangtt-ftel-isc, net8.0, user cấp + duyệt cài). Đọc README NuGet trước khi wire. Program.cs: builder.AddStandardObservability(ServiceName) trước Build + app.UseStandardObservability() sau UseForwardedHeaders/trước UseExceptionHandler. GATE: chỉ bật khi có Otel:OtlpEndpoint (mặc định rỗng → tắt) VÀ không ở Testing → suite 56/56 + dev không nhiễu. appsettings: ServiceName=qgp-api, ServiceVersion, Otel:{OtlpEndpoint(rỗng), EnableEntityFramework=true, EnableQuartz=true, Redis/Mongo/MassTransit/Grpc=false}. VERIFY THẬT (BE dev, Otel__OtlpEndpoint=http://localhost:4317, chưa có collector): app boot OK · GET /v1/documents/QA-PROC-005 → 200 · GET doc lạ → 404 envelope {error:{code:DOCUMENT_NOT_FOUND,message}} GIỮ NGUYÊN (ADR-0014 KHÔNG bị ISC exception middleware phá) · log Serilog JSON có ServiceName+TraceId+SpanId+CorrelationId mỗi request, EF query correlate cùng TraceId, OTLP export fail im lặng (không có collector, không fatal). Test: build clean, 55/56 (1 = SearchTests Meili-async flaky, pass isolated). QUAN TRỌNG: dùng Host=127.0.0.1 cho test/dev (IPv6 Docker flaky). DEPLOY.md §10 + .env.prod.example (OTEL_OTLP_ENDPOINT) + compose api env cập nhật. || Trước: A5+A6+A7-bảo-mật (2026-07-26): hardening go-live (KHÔNG thêm NuGet — dùng shared framework). A7 bảo mật: (1) Rate limiting (System.Threading.RateLimiting) — GlobalLimiter fixed-window theo IP, path /auth siết riêng (chống brute-force), ngưỡng RateLimit:{Enabled,PermitLimit=100,WindowSeconds=10,AuthPermitLimit=10,AuthWindowSeconds=60}, 429 khi vượt; MẶC ĐỊNH OFF ở env Testing (tránh nhiễu suite), test opt-in. (2) ForwardedHeaders (XForwardedFor/Proto, Clear KnownNetworks/Proxies) lấy IP thật sau nginx. (3) Security headers middleware: X-Content-Type-Options nosniff, X-Frame-Options DENY, Referrer-Policy no-referrer. (4) nginx.conf: 3 header đó + CSP (comment, cần điền origin Keycloak vào connect-src) + HTTPS-redirect/HSTS ở block 443. A5 secrets (ADR-0012): AddKeyPerFile(QGP_SECRETS_DIR mặc định /run/secrets, optional) — file name=config key ('__' nesting), dùng được Vault Agent + Docker secrets, KHÔNG thêm lib; SECRETS.md (dev user-secrets · CI GitLab masked · prod Vault Agent template + dynamic DB creds). A6 backup: deploy/backup/pg_backup.sh (pg_dump gzip + retention) + content_repo_backup.sh (git bundle + optional push mirror GitLab). DEPLOY.md thêm §7 bảo mật §8 secrets §9 backup §10 OTel-chờ. VERIFY: BE 56/56 (×2 deterministic; +3 test: security headers, rate-limit 429, file-secret override CORS) · bash -n scripts OK. GOTCHA: rate-limit env leak giữa test class (RateLimitTests set PermitLimit=2 process-global) → giải bằng default-off-ở-Testing + opt-in + clear ở Dispose. A7-OTel HOÃN: user có OTel SDK nội bộ FPT, sẽ gửi link package → wire sau (điểm cắm Program.cs, bật khi có OTEL_EXPORTER_OTLP_ENDPOINT). || Trước: A3+A4 đóng gói + hạ tầng (2026-07-26): Docker hoá + CI + CORS prod. (1) CORS: Program.cs đọc Cors:AllowedOrigins (csv, env Cors__AllowedOrigins) thay hardcode localhost:5173 + appsettings + 2 test (allow origin cấu hình / chặn origin lạ). (2) apps/api/Dockerfile: multi-stage sdk8→aspnet8, non-root user 'app', publish UseAppHost=false, ASPNETCORE_URLS :8080, QGP_GIT_REPO_PATH=/data/content-repo (volume) + .dockerignore. (3) apps/web/Dockerfile: node20 build (VITE_* qua build-arg, bake lúc build) → nginx:1.27-alpine + nginx.conf (SPA fallback + proxy /v1,/auth,/healthz→api:8080, block 443 TLS comment sẵn) + .dockerignore. (4) deploy/docker-compose.prod.yml: pg+meili+redis+keycloak+api(build,Auth:Mode=Oidc,env)+web(build,ports 80/443), biến qua .env.prod (${VAR:?}). (5) deploy/.env.prod.example (secret placeholder CHANGE_ME). (6) .gitlab-ci.yml (ADR-0011): validate(redocly openapi)→test(BE dotnet+service pg/meili · FE typecheck/test/build)→package(docker build+push, chỉ default branch/tag). (7) deploy/DEPLOY.md (build/run/TLS self-signed+LE/Keycloak hardening/CI vars). VERIFY THẬT: BE 53/53 · docker build cả 2 image OK · smoke: BE container /→{qgp-api,ok}, FE container /→200 có #root+assets/*.js · compose prod config OK · gitlab-ci YAML valid. LƯU Ý: BE image ASPNETCORE_ENVIRONMENT=Production → KHÔNG auto-migrate/seed (prod phải chạy `dotnet ef database update` tay — ghi trong DEPLOY.md). nginx proxy_pass http://api:8080 resolve lúc start (đứng standalone cần --add-host; trong compose service 'api' tự resolve). || Trước: A1b FE OIDC redirect (2026-07-26): FE login THẬT qua Keycloak (Authorization Code + PKCE) thay mock. Cài react-oidc-context ^3.3.1 + oidc-client-ts ^3.5.0 (MIT, user duyệt Hard Stop). Thiết kế GIỮ NGUYÊN surface useAuth() (user/isAuthenticated/login/logout/hasAnyRole) → guards/pages/client.ts/test cũ KHÔNG đổi. Bật OIDC bằng env VITE_OIDC_AUTHORITY (có→OIDC, không→giữ mock/dev-login, backward-compat). Files: auth/oidcConfig.ts (OIDC_ENABLED + config PKCE + automaticSilentRenew), auth/tokenRoles.ts (decode JWT payload base64url + map realm_access.roles lowercase→app Role mirror BE + subjectFromToken ưu tiên preferred_username), auth/AuthContext.tsx (tách LocalAuthProvider giữ nguyên + OidcAuthProvider mới: suy user/roles từ access_token, sync localStorage qgp.access_token cho client.ts, login→signinRedirect logout→signoutRedirect, splash khi isLoading/error tránh nháy /login lúc callback), App.tsx (bọc react-oidc-context AuthProvider khi OIDC_ENABLED), LoginPage.tsx (OIDC→nút SSO redirect bỏ qua sub/roles), .env.oidc + script dev:oidc. TEST: FE 42/42 (+5 tokenRoles +6 oidcAuth, auth.test.tsx cũ vẫn xanh) · typecheck sạch · vite build OK (382KB/gzip116KB). VERIFY hạ tầng: Keycloak token endpoint trả CORS Access-Control-Allow-Origin: http://localhost:5173 (webOrigins qgp-web) → PKCE code-exchange chạy được. CÒN LẠI: click-through browser thật (SSO) user tự làm — `npm run dev:oidc` + BE Oidc mode + Keycloak :8081. || Trước: A1a BE OIDC Keycloak (2026-07-26): API .NET giờ nhận token Keycloak thật. (1) KeycloakClaimsTransformation (IClaimsTransformation, Auth/) flatten realm_access.roles(JSON) → app role qua Auth:RoleMap, thêm claim 'role', idempotent, default-deny, case-insensitive, malformed→rỗng-không-throw. (2) AuthSetup Oidc branch: bind Auth:RoleMap + đăng ký transformation; FIX issuer=authority (BaseParams cũ hardcode ValidIssuer='qgp-dev' → sẽ REJECT token thật) + thêm Auth:RequireHttpsMetadata (default true, local Keycloak http cần false). (3) FIX bug tiềm ẩn: /auth/dev-login thiếu [FromServices] trên DevTokenIssuer? → ở Oidc mode minimal API coi là body param thứ 2 → 'Failure to infer parameters' → app CRASH lúc start. Thêm [FromServices] → gate null→404 mới chạy. (4) appsettings.json thêm Auth:{Mode:Dev,Issuer,Audience,OidcAuthority,RequireHttpsMetadata,RoleMap}. (5) docker-compose thêm service keycloak (quay.io/keycloak/keycloak:26.0, start-dev --import-realm, port 8081, KC_BOOTSTRAP_ADMIN_*) + deploy/keycloak/realm-qgp.json (realm qgp, 6 realm role lowercase reader..admin, client qgp-web public+PKCE+directGrant + audience mapper→qgp-api, client qgp-api bearerOnly, 5 user mẫu Password123!). KHÔNG thêm NuGet. TEST: BE 51/51 (6 KeycloakClaimsTransformationTests + 2 OidcModeAuthTests, serialized). E2E THẬT: boot Keycloak → lấy token author1 (direct grant) → iss=http://localhost:8081/realms/qgp, aud=qgp-api, realm_access.roles=[reader,author] khớp giả định; chạy BE Oidc mode :5049 → /me author1 roles=READER,AUTHOR · admin1 /admin/ping 200 · reader1 403 · no-token 401. LƯU Ý: sub Keycloak = UUID (không phải username); preferred_username=author1 → user provisioning (display_name/email) để A1b/sau. || Trước: FE Phase 2 reconcile theo DESIGN_BRIEF (2026-07-26): user hỏi có đối chiếu design chưa → phát hiện tao KHÔNG đọc DESIGN_BRIEF khi dựng màn Phase 2. Đã reconcile 3 phần. Part A (component §8): DocumentCard (thay RecCard, có reasonChip), RecommendationPanel, LearningPathChecklist, DashboardTile, BarChart, AppNav (tách từ AppShell). Part B (scope S15): thêm /reports/feedback (RPT-F-05 real: by_status+avg_resolution_hours) + /reports/access (RPT-F-03 PROXY theo ack + note giới hạn) + charts vào ReportsPage. Part C (S19 subscription): bảng subscriptions (migration AddSubscriptions) + SubscriptionService (subscribe/unsubscribe/list, upsert user) + SubscribeButton trên DocumentPage + notification giờ gửi cho audience∪subscribers. BE 43/43 · FE 31/31 · openapi valid · E2E real. LƯU Ý: color/token ĐÃ khớp design (#00A76F Minimal UI) từ Phase 1; gap là tao chưa đọc DESIGN_BRIEF. || Trước: 🎉 PHASE 2 DONE — E2.2 Onboarding + E2.3 Reports + E2.4 Notifications (2026-07-26):\" E2.4 Notifications S19 (ADM-F-04): bảng notifications (migration AddNotifications + AddNotificationDocFk FK cascade) + NotificationService (CreateForAudienceAsync sinh cho user có role trong doc_audience_roles, KHÔNG SaveChanges; List/MarkRead/MarkAllRead; mark-read chỉ owner) + wire vào EffectiveTransition path (VersionService.PublishAsync + EffectiveTransitionService scheduler) + 3 endpoint [DocRead] + openapi (Notifications tag/schema). FE: NotificationBell dropdown trong AppShell (badge unread + mark read/all, stateful mock). || E2.3 Reports S15 (RPT-F-01/02/04): ReportService (issuance: total/effective/by_type/by_version_status/issued_this_month/overdue+due_soon review/with_change_summary_pct; compliance: per mandatory-effective doc audience_count/acked_count/percent/not_read) + 2 endpoint [AdminConfig] + DTOs. openapi để loose (additionalProperties) → FE local interface (tiền lệ DiffResult). FE ReportsPage /reports [ADMIN_ROLES] dashboard. || E2.2 Onboarding S12 (ONB-F-01/02/04): bảng learning_paths/path_items (migration AddOnboarding) + OnboardingService (gộp path theo role, item theo seq, acked từ ack Effective, progress %) + endpoint [DocRead] + seed READER path (DevDataSeeder.SeedOnboardingPathAsync độc lập) + openapi. FE OnboardingPage /onboarding (progress bar + checklist). BE 41/41 (serialized xunit.runner.json — tránh flaky audit top-N/Meili async) · FE 30/30 · openapi Redocly valid · E2E real :5048 cả 3. Cài dotnet-ef global 8.0.29. || Trước: E2.1 REC engine + Home S2 + 'Bắt đầu từ đâu' S11 (2026-07-26):\" REC rules-based explainable BR-11 (SDD §5.2). BE: RecommendationService (candidates = Effective ∩ audience_roles(user.roles); bucket must_read/suggested; reason 'Bắt buộc'/'Cần đọc lại'/'Vừa cập nhật'/'Khớp vai trò'; read-only KHÔNG upsert user; ack lookup qua Acknowledgements.User.SsoSubject; major = version endsWith '.0'; recent = effective_date trong 14 ngày) + RecommendationItemDto/RecommendationsDto + GET /v1/recommendations [DocRead] (roles đọc từ claim 'role' via V1Endpoints.Roles()) + Program DI. Redis cache 5m DEFER (rules-based là cốt lõi BR-11). FE: types alias Recommendations/RecommendationItem, client.getRecommendations + mockGetRecommendations, useRecommendations hook (dùng chung), RecCard (badge màu theo reason), HomePage S2 (route '/' — greeting theo user.sub + must_read/suggested + CTA /start) THAY redirect→/documents cũ, StartHerePage S11 (route '/start' — lộ trình đánh số bắt buộc trước), AppShell nav (Home + Bắt đầu từ đâu cho mọi user), i18n home/start. BE 35/35 (+3 RecommendationTests: audience filter, mandatory→must_read, ack rời must_read, no-role 403) · FE 27/27 (+HomePage +StartHerePage) · typecheck+vite build OK · E2E real :5048: READER→QA-PROC-005 'Bắt buộc', ADMIN(ngoài audience)→rỗng, no-role→403. || Trước: 🎉 PHASE 1 MVP HOÀN TẤT (2026-07-25) — E1.8 KB S10 (KbPage: browse Effective nhóm theo type, route /kb, dùng lại listDocuments, BR-06) là task cuối. Toàn Phase 1 (E1.1-E1.10) xong: DOC lifecycle+scheduler, Document view S4, Search S3, History+diff S6, Editor S7, Review S9, Publish S8, Git store (ADR-0015), Audit S16, Feedback S13/S14, KB S10. BE 32/32 · FE 25/25 · openapi valid · mọi E2E real trên :5048. || Trước: E1.9 Feedback S13/S14:" BE POST /v1/feedback [DocRead] (server gắn version_id từ doc_id+version — FBK-F-04) + GET /feedback [AdminConfig] (triage list) + PATCH /feedback/{id} [AdminConfig] + FeedbackService + Mapping category wire↔enum (content_error↔ContentError) + openapi (GET /feedback + doc_id/version vào Feedback schema). FE FeedbackButton S13 (popover trên DocumentPage) + FeedbackTriagePage S14 (route /feedback [ADMIN_ROLES]) + client/mock. BE 32/32 · FE 24/24 · openapi valid · E2E real. CHỈ CÒN E1.8 KB. || Trước: E1.10 Audit log UI S16:" BE GET /v1/audit [AdminConfig] + AuditService.ListAsync (resolve actor_id→sso_subject, actor_id null→'system', lọc document_id/from/to, At partition-pruning) + AuditEntryDto. FE listAudit+mockListAudit, AuditPage S16 (bảng time/actor/action) + route /audit [ADMIN_ROLES] + link AppShell. BE 30/30 · FE 23/23 · E2E real (actor resolve + READER 403). || Trước: E1.6b-2 Publish dialog S8:" BE /review-queue thêm param status (InReview/Approved, default InReview) + ListReviewQueueAsync(status). FE listReviewQueue(status)+publishVersion+mockPublishVersion (+APPROVED_QUEUE), PublishPage S8 (form issue/effective/change_summary validate BR-04/07) + route /publish + link AppShell. BE 28/28 (×3 ổn định) · FE 22/22 · openapi valid · E2E real: approve→publish-queue→publish→Effective+content_git_ref. Fix flaky SearchTests (poll Meili async index, KHÔNG do git). || Trước: E1.6b-1 Git content store (ADR-0015):" user chốt phương án A — bare repo local + LibGit2Sharp, commit-on-publish. IGitContentStore/LibGit2GitContentStore (repo path env QGP_GIT_REPO_PATH>config Git:RepoPath>content-repo, static lock, write {docId}/{version}.md + commit). VersionService.PublishAsync commit → set content_git_ref (SHA). Draft vẫn ở DB content_markdown. BE 27/27. E2E real: publish→content_git_ref set + git log có commit + file .md. NEXT E1.6b-2 = Publish dialog S8 (FE). || Trước: E1.5 Version history + diff S6:" BE GET /v1/documents/{docId}/diff?from&to [DocRead] + UnifiedDiff.cs (LCS DP dependency-free, 1 hunk + context) + DocumentService.GetDiffAsync. FE HistoryPage S6 (/documents/:docId/history) + useVersionHistory + DiffView (tô màu +/-) + link từ DocumentPage. BE 26/26 · FE 20/20 · E2E real diff OK. || Trước đó: NEXT-list Task 1→5 (real-mode, review queue, search, editor, audit partition). Chi tiết auto-memory qgp-prd-baseline.md. BE: openapi GET /review-queue + schema ReviewQueueItem, DocumentService.ListReviewQueueAsync (status InReview, FIFO updated_at), endpoint [DocApprove]. FE: listReviewQueue+approveVersion (client+mock), APPROVE_ROLES, ReviewQueuePage (approve/reject-cần-comment) + hook, route /review guard + link AppShell, i18n review. BE 19/19 · FE 16/16 · openapi Redocly valid · E2E real: submit→queue, READER 403. (Task 1 xong trước: FE real-mode dev:real/.env.real, proxy default :5048.)"
+session_count: 6
+consecutive_failures: 0
+
+# ── Completed tasks (append, archive sau 2 sprints) ────────────────
+completed_tasks:
+- date: "2026-07-26"
+  task: "B1 Admin/S17 ĐẦY ĐỦ — RBAC read + users + tags CRUD + doc audience + doc-types CHIỀU SÂU (Type enum→string) + AdminPage FE 4 tab"
+  files_modified: [apps/api/src/Qgp.Api/Application/AdminService.cs (NEW), Application/DocumentService.cs (audience + validate type + bỏ Mapping.DocType*), Application/{SearchService,ReportService}.cs, Application/Mapping.cs (bỏ DocType map), Domain/Entities/DocType.cs (NEW), Domain/Entities/Documents.cs (Type string), Domain/Enums/DocumentType.cs (DELETED), Contracts/Dtos.cs (admin DTOs), Api/V1Endpoints.cs (admin + doc-types + audience), Program.cs (DI AdminService), Infrastructure/Persistence/{QgpDbContext.cs (DocType + seed), DevDataSeeder.cs}, Migrations/*_AddDocTypes.cs (NEW), tests/{AdminApiTests,DocAudienceTests,DocTypesTests}.cs (NEW), apps/web/src/{api/{types,client,mock}.ts, pages/AdminPage.tsx, test/AdminPage.test.tsx}, product-spec/api/openapi.yaml (tag Admin + 8 path)]
+  pattern_phase: 5
+  notes: "Epic B DONE. Doc-types deep refactor 0 regression (BE 67/67). FE 43/43 + build OK. Redocly valid. Follow-up: audience UI per-doc (b1c1)."
+- date: "2026-07-26"
+  task: "B0 projection user/role (UserProvisioningService, gọi ở /me) + B2 review-cycle reminders DOC-F-08 (ReviewReminderService + ReviewReminderJob Quartz)"
+  files_modified: [apps/api/src/Qgp.Api/Application/UserProvisioningService.cs (NEW), apps/api/src/Qgp.Api/Application/ReviewReminderService.cs (NEW), apps/api/src/Qgp.Api/Infrastructure/Scheduling/ReviewReminderJob.cs (NEW), apps/api/src/Qgp.Api/Auth/AuthEndpoints.cs (/me sync), apps/api/src/Qgp.Api/Program.cs (DI 2 service + Quartz ReviewReminderJob), apps/api/src/Qgp.Api/appsettings.json (Review:LeadDaysWarn + Scheduler:ReviewReminderIntervalSeconds), apps/api/tests/Qgp.Api.Tests/UserProvisioningTests.cs (NEW), apps/api/tests/Qgp.Api.Tests/ReviewReminderTests.cs (NEW)]
+  pattern_phase: 5
+  notes: "Epic B (2b, task_tracker b0f0/b2a0 closed). Không thêm NuGet, không migration (dùng bảng users/user_roles/roles/notifications/documents sẵn có). Keycloak vẫn nguồn authz; DB chỉ chiếu. B2 recipients cần B0 để có dữ liệu prod. BE 59/59. B1 (Admin/S17) còn lại — task lớn."
+- date: "2026-07-26"
+  task: "A7-OTel — wire ISC.Observability 1.2.2 (SDK FPT): traces/metrics/logs OTLP + TraceId, gate theo Otel:OtlpEndpoint, envelope ADR-0014 giữ nguyên"
+  files_modified: [apps/api/src/Qgp.Api/Qgp.Api.csproj (+ISC.Observability 1.2.2), Program.cs (AddStandardObservability+UseStandardObservability gated), appsettings.json (ServiceName/ServiceVersion/Otel), deploy/DEPLOY.md (§10), deploy/.env.prod.example (OTEL_OTLP_ENDPOINT), deploy/docker-compose.prod.yml (api Otel__OtlpEndpoint)]
+  pattern_phase: 5
+  notes: "User cấp package + duyệt cài (Hard Stop). Gate bật khi có Otel:OtlpEndpoint, off ở Testing. VERIFY thật với obs ON: boot OK, Serilog JSON + TraceId, envelope 404 {error:{code}} nguyên vẹn. 55/56 (Search flaky). Dùng 127.0.0.1 tránh IPv6 Docker flaky."
+- date: "2026-07-26"
+  task: "A5+A6+A7-bảo-mật — rate limit + security headers + file-secrets (Vault-ready) + backup scripts (A7-OTel hoãn chờ package FPT)"
+  files_modified: [apps/api/src/Qgp.Api/Program.cs (rate limiter + forwarded headers + security headers + AddKeyPerFile), appsettings.json (RateLimit), apps/api/tests/Qgp.Api.Tests/HardeningTests.cs (NEW: headers+429+file-secret), apps/web/nginx.conf (headers+CSP), deploy/backup/{pg_backup.sh,content_repo_backup.sh} (NEW), deploy/SECRETS.md (NEW), deploy/DEPLOY.md (§7-10)]
+  pattern_phase: 5
+  notes: "KHÔNG thêm NuGet (RateLimiter/ForwardedHeaders/KeyPerFile ở shared framework). Rate limit off mặc định ở Testing (env leak fix). BE 56/56 ×2. OTel dời sang khi có OTel SDK nội bộ FPT."
+- date: "2026-07-26"
+  task: "A3+A4 đóng gói + hạ tầng — Dockerfile api/web + nginx + docker-compose.prod + .gitlab-ci + CORS configurable"
+  files_modified: [apps/api/src/Qgp.Api/Program.cs (CORS env), apps/api/src/Qgp.Api/appsettings.json (Cors), apps/api/tests/Qgp.Api.Tests/CorsConfigTests.cs (NEW), apps/api/Dockerfile (NEW), apps/api/.dockerignore (NEW), apps/web/Dockerfile (NEW), apps/web/nginx.conf (NEW), apps/web/.dockerignore (NEW), deploy/docker-compose.prod.yml (NEW), deploy/.env.prod.example (NEW), deploy/DEPLOY.md (NEW), .gitlab-ci.yml (NEW)]
+  pattern_phase: 5
+  notes: "Verify thật: BE 53/53 · docker build+smoke cả 2 image OK · compose config OK · CI YAML valid. CORS default giữ localhost:5173 (dev không đổi). BE image Production→không auto-migrate (DEPLOY.md ghi rõ chạy ef tay). Keycloak trong compose.prod vẫn start-dev (staging); prod hardening để A5-A7. Không thêm app dependency."
+- date: "2026-07-26"
+  task: "A1b FE OIDC redirect — login thật Keycloak (Authorization Code + PKCE) qua react-oidc-context, giữ nguyên useAuth() surface"
+  files_modified: [apps/web/package.json (+react-oidc-context ^3.3.1 +oidc-client-ts ^3.5.0 +script dev:oidc), apps/web/.env.oidc (NEW), apps/web/src/auth/oidcConfig.ts (NEW), apps/web/src/auth/tokenRoles.ts (NEW), apps/web/src/auth/AuthContext.tsx (tách Local/Oidc provider), apps/web/src/App.tsx, apps/web/src/pages/LoginPage.tsx, apps/web/src/test/{tokenRoles.test.ts,oidcAuth.test.tsx} (NEW)]
+  pattern_phase: 5
+  notes: "Hard Stop dependency user duyệt (MIT). Bật bằng VITE_OIDC_AUTHORITY (backward-compat, mock/dev-login vẫn chạy khi không set). Roles suy từ ACCESS token (realm_access), KHÔNG phải ID token — decode client-side chỉ cho UX/guard, server (A1a) mới xác thực. FE 42/42 · build OK. CORS token endpoint OK cho :5173. Còn browser click-through manual."
+- date: "2026-07-26"
+  task: "A1a BE OIDC Keycloak — nhận token Keycloak thật (realm_access.roles→app role qua RoleMap) + realm docker-compose"
+  files_modified: [apps/api/src/Qgp.Api/Auth/KeycloakClaimsTransformation.cs (NEW), Auth/AuthSetup.cs, Auth/AuthEndpoints.cs, appsettings.json, apps/api/tests/Qgp.Api.Tests/{KeycloakClaimsTransformationTests,OidcModeAuthTests}.cs (NEW), deploy/docker-compose.yml, deploy/keycloak/realm-qgp.json (NEW)]
+  pattern_phase: 5
+  notes: "Không thêm NuGet (dùng JwtBearer sẵn). Fix 2 bug tiềm ẩn Oidc mode: (a) ValidIssuer hardcode 'qgp-dev' → reject token Keycloak → sửa dùng authority; (b) /auth/dev-login thiếu [FromServices] → app crash lúc start ở Oidc. Thêm Auth:RequireHttpsMetadata (local Keycloak http). BE 51/51. E2E thật với Keycloak :8081: /me author1=READER,AUTHOR, admin1 ping 200, reader1 403, no-token 401. sub=UUID (không phải username)."
+- date: "2026-07-26"
+  task: "FE Phase 2 reconcile theo DESIGN_BRIEF (design-system §8 + scope S15/S19 + subscription)"
+  files_modified: [apps/web/src/components/{DocumentCard,DashboardTile,BarChart,AppNav,AppShell}.tsx, features/recommendations/RecommendationPanel.tsx (RecCard xoá), features/onboarding/LearningPathChecklist.tsx, features/subscriptions/{SubscribeButton}.tsx, features/reports/useReports.ts, pages/{HomePage,StartHerePage,OnboardingPage,ReportsPage,DocumentPage}.tsx, api/{types,client,mock}.ts, i18n, test/*, apps/api/src/Qgp.Api/Application/{ReportService,SubscriptionService,NotificationService}.cs, Contracts/Dtos.cs, Api/V1Endpoints.cs, Program.cs, Domain/Entities/Engagement.cs, Infrastructure/Persistence/QgpDbContext.cs, Migrations/*_AddSubscriptions.cs, tests/{ReportTests,SubscriptionTests}.cs, product-spec/api/openapi.yaml]
+  pattern_phase: 5
+  notes: "DESIGN_BRIEF_QGP_v0.1.md là bản design ĐỌC ĐƯỢC (HTML là bundle mã hoá). Reconcile: đúng tên component §8 + lấp scope S15 (feedback real + access proxy + charts) + S19 subscription (bảng mới). BE 43/43 · FE 31/31."
+- date: "2026-07-26"
+  task: "E2.4 Notifications S19 (ADM-F-04) — bell + sinh notification khi doc thành Effective"
+  files_modified: [apps/api/src/Qgp.Api/Domain/Entities/Engagement.cs (Notification), Application/NotificationService.cs, VersionService.cs, EffectiveTransitionService.cs, Api/V1Endpoints.cs, Contracts/Dtos.cs, Program.cs, Infrastructure/Persistence/QgpDbContext.cs, Migrations/*_AddNotifications.cs + *_AddNotificationDocFk.cs, tests/NotificationTests.cs, tests/xunit.runner.json + csproj, product-spec/api/openapi.yaml, apps/web/src/{api,features/notifications,components/AppShell,i18n,test}]
+  pattern_phase: 5
+  notes: "FK Document cascade (tránh orphan doc_id treo). Sinh ở cả publish-tới-hạn + scheduler. Bell dropdown AppShell. xunit.runner.json serialize test (flaky do audit top-N + Meili async khi thêm 4 test class)."
+- date: "2026-07-26"
+  task: "E2.3 Reports S15 (RPT-F-01/02/04) — issuance + compliance dashboard"
+  files_modified: [apps/api/src/Qgp.Api/Application/ReportService.cs, Contracts/Dtos.cs, Api/V1Endpoints.cs, Program.cs, tests/ReportTests.cs, apps/web/src/{api/{types,client,mock}.ts, features/reports/useReports.ts, pages/ReportsPage.tsx, router.tsx, components/AppShell.tsx, i18n/strings.ts, test/ReportsPage.test.tsx}]
+  pattern_phase: 5
+  notes: "openapi loose (additionalProperties) → FE local interface (tiền lệ DiffResult). Không bảng mới. RBAC admin.config. Compliance audience = user_roles ∩ doc_audience_roles."
+- date: "2026-07-26"
+  task: "E2.2 Onboarding S12 (ONB-F-01/02/04) — learning path + checklist %"
+  files_modified: [apps/api/src/Qgp.Api/Domain/Entities/Onboarding.cs, Application/OnboardingService.cs, Contracts/Dtos.cs, Api/V1Endpoints.cs, Program.cs, Infrastructure/Persistence/{QgpDbContext,DevDataSeeder}.cs, Migrations/*_AddOnboarding.cs, tests/OnboardingTests.cs, product-spec/api/openapi.yaml, apps/web/src/{api,features/onboarding,pages/OnboardingPage,router,components/AppShell,i18n,test}]
+  pattern_phase: 5
+  notes: "Bảng learning_paths/path_items (đã xoá khỏi not_yet_created). Seed READER path độc lập. openapi + gen:api types. Route /onboarding."
+- date: "2026-07-26"
+  task: "E2.1 REC engine (rules-based explainable BR-11) + Home S2 + Bắt đầu từ đâu S11"
+  files_modified: [apps/api/src/Qgp.Api/Application/RecommendationService.cs, Contracts/Dtos.cs, Api/V1Endpoints.cs, Program.cs, apps/api/tests/Qgp.Api.Tests/RecommendationTests.cs, apps/web/src/api/{types.ts,client.ts,mock.ts}, apps/web/src/features/recommendations/{useRecommendations.ts,RecCard.tsx}, apps/web/src/pages/{HomePage.tsx,StartHerePage.tsx}, apps/web/src/router.tsx, components/AppShell.tsx, i18n/strings.ts, test/{HomePage,StartHerePage}.test.tsx]
+  pattern_phase: 5
+  notes: "SDD §5.2. GET /v1/recommendations [DocRead] đã có sẵn openapi (contract-first, không đổi). Roles từ claim 'role'. Read-only (không upsert user). Reason explainable trả nguyên văn tiếng Việt (UI hiển thị trực tiếp). '/' đổi từ redirect→/documents thành HomePage. Redis cache defer. BE 35/35 · FE 27/27 · E2E real :5048."
+- date: "2026-07-11"
+  task: "Sprint 1 FE scaffold + Document view (S4) vertical slice"
+  files_modified: [apps/web/** (37 files), apps/web/src/features/documents/DocumentView.tsx, apps/web/src/api/client.ts]
+  pattern_phase: 5
+  notes: "typecheck OK · 8/8 test · vite build OK. Dev chạy mock (VITE_USE_MOCK=1), tài liệu mẫu QA-PROC-005."
+- date: "2026-07-11"
+  task: "T5 BE tầng dữ liệu + EF migration + seed roles"
+  files_modified: [apps/api/** (sln + Qgp.Api + Qgp.Api.Tests), apps/api/src/Qgp.Api/Infrastructure/Persistence/QgpDbContext.cs, apps/api/src/Qgp.Api/Domain/Entities/*, Migrations/*_InitialCreate.cs]
+  pattern_phase: 5
+  notes: "build 0 err · 7/7 test (model-metadata, không cần DB) · migrations script verify uq_one_effective_per_doc (BR-02) + ck_effective_ge_issue (BR-07) + uq_doc_id (BR-01) + schema qgp + seed 6 roles."
+- date: "2026-07-11"
+  task: "T1/E0.1 docker-compose local + áp migration vào Postgres thật"
+  files_modified: [deploy/docker-compose.yml, apps/api/src/Qgp.Api/Program.cs (AddDbContextCheck /healthz)]
+  pattern_phase: 5
+  notes: "docker compose up -d: postgres16(pgvector)+redis healthy, meili running. `dotnet ef database update` OK (migration InitialCreate applied). Verify DB thật: 12 bảng + partial index def + 6 roles; BR-02 ENFORCED (chèn 2 bản Effective/doc → duplicate key uq_one_effective_per_doc → T5 DoD đóng). healthz smoke: sau khi user restart Docker → GET :8080/healthz = 200 'Healthy' (AddDbContextCheck xanh), root 200. T1 DoD xanh hoàn toàn."
+- date: "2026-07-11"
+  task: "T6 auth (mock OIDC) + RBAC §10.1 + FE login/guard"
+  files_modified: [apps/api/src/Qgp.Api/Auth/* (QgpAuth/DevTokenIssuer/AuthSetup/AuthEndpoints), apps/api/src/Qgp.Api/Program.cs, apps/api/tests/.../AuthEndpointsTests.cs, apps/web/src/auth/* (AuthContext/guards/roles), apps/web/src/pages/{LoginPage,ForbiddenPage,AdminPage}.tsx, apps/web/src/router.tsx, App.tsx, AppShell.tsx, i18n/strings.ts, test/auth.test.tsx]
+  pattern_phase: 5
+  notes: "BE: JwtBearer Dev=HS256 (khoá env QGP_AUTH_SIGNING_KEY hoặc ephemeral, KHÔNG commit secret) | Prod=OIDC authority. 5 policy §10.1 (doc.read/kb.contribute/doc.author/doc.approve/admin.config). Endpoint /auth/dev-login (dev), /me, /admin/ping (demo RBAC). BE 12/12 test (WebApplicationFactory, không chạm DB): 401 no-token, login→/me roles, /admin/ping 403 READER vs 200 ADMIN, dev-login 422 role lạ. FE 12/12 test: AuthContext login/logout, RequireAuth→/login, RequireRole→/403. typecheck+build OK. FE login mock cục bộ (VITE_USE_MOCK) — bỏ mock để gọi /auth/dev-login thật khi wire E1."
+- date: "2026-07-11"
+  task: "E1.1 wire controllers /v1 (DOC lifecycle WF-01 + đọc) + services + RBAC + FE nối API thật"
+  files_modified: [apps/api/src/Qgp.Api/Contracts/Dtos.cs, Application/{AppException,Mapping,AuditService,DocumentService,VersionService}.cs, Api/{QgpExceptionHandler,V1Endpoints}.cs, Infrastructure/Persistence/DevDataSeeder.cs, Migrations/*_AddVersionContent.cs, Program.cs, tests/{QgpApiFactory,DocLifecycleTests}.cs, product-spec/adr/0014-api-response-envelope.md, apps/web/{vite.config.ts, src/auth/AuthContext.tsx}]
+  pattern_phase: 5
+  notes: "Endpoint /v1: GET documents/{docId}, /versions; POST documents [DocAuthor], versions [DocAuthor], submit [DocAuthor], approve/publish [DocApprove], acknowledge [DocRead]. WF-01 state machine (Draft→InReview→Approved→Published→Effective; reject→Draft; publish tới hạn→Effective+supersede BR-02; future→badge). BR-04/07 validate, BR-03 immutable. Envelope theo openapi (ADR-0014). JSON snake_case. Markdig render content_html từ content_markdown (cột mới, migration AddVersionContent). Dev seed QA-PROC-005 (v2.1 Effective/v2.0 Superseded). BE 15/15 test (7 data+5 auth+3 lifecycle trên Postgres). Smoke E2E: GET /v1/documents/QA-PROC-005 → Effective+content_html OK. FE: proxy /auth+/v1, realDevLogin gọi /auth/dev-login; VITE_USE_MOCK vẫn =1 mặc định (bỏ để chạy thật)."
+- date: "2026-07-11"
+  task: "E1.2 Scheduler WF-03 (Quartz.NET) auto Published→Effective + supersede"
+  files_modified: [apps/api/src/Qgp.Api/Application/{EffectiveTransition,EffectiveTransitionService}.cs, Infrastructure/Scheduling/EffectiveTransitionJob.cs, Program.cs (AddQuartz + hosted, gated non-Testing), appsettings.json (Scheduler:IntervalSeconds), Application/VersionService.cs (dùng chung EffectiveTransition.Apply), tests/SchedulerTests.cs]
+  pattern_phase: 5
+  notes: "EffectiveTransition.Apply (DRY): dùng chung publish-tới-hạn + scheduler. EffectiveTransitionService.RunAsync(asOf) quét status='Published' AND effective_date<=asOf → Effective+supersede, idempotent, order by effective_date/version. Job [DisallowConcurrentExecution], interval config (default 60s), hosted CHỈ khi env != Testing (test resolve service trực tiếp). BE 16/16 test (thêm SchedulerTests: future→due→Effective, đúng 1 Effective/doc, idempotent). Startup smoke: Quartz 3.13 started + job fire query quét đúng trên Postgres, healthz 200. Ghi chú BR-05/08: ack per-version nên major mới tự khắc chưa ack (không cần reset thủ công)."
+- date: "2026-07-13"
+  task: "E1.4 Search Meilisearch (chỉ Effective BR-06) + list documents + FE màn Tài liệu S3"
+  files_modified: [apps/api/src/Qgp.Api/Infrastructure/Search/MeiliSearchIndex.cs (HttpClient thô), Application/SearchService.cs, DocumentService.cs (ListAsync), Api/V1Endpoints.cs (/search + /documents), Auth/AuthEndpoints.cs (/admin/reindex), VersionService.cs + EffectiveTransitionService.cs (hook index), Program.cs (HttpClient Meili + startup reindex), appsettings.json (Meili), tests/SearchTests.cs, apps/web/src/{pages/DocumentsPage.tsx, features/documents/useDocumentList.ts, api/client.ts+mock.ts, router.tsx, components/AppShell.tsx, i18n/strings.ts, test/DocumentsPage.test.tsx}]
+  pattern_phase: 5
+  notes: "Index 'documents' primary key=doc_id; searchable [title,content,tags], filterable [type,tags]. Chỉ index bản Effective (BR-06) — hook sau publish-effective + scheduler; content_html→plain text (Markdig.ToPlainText). /v1/search (q/type/tag/limit) + /v1/documents (list DB, ILike q). /admin/reindex [AdminConfig] rebuild. BE 17/17 (SearchTests: Effective tìm thấy, Draft KHÔNG index). Smoke: reindex indexed=1, search 'Quality'→QA-PROC-005 score 0.76, 'luong'+type=Process→QA-PROC-005. FE S3: DocumentsPage search debounce 300ms + list link S4; FE 13 test. QUAN TRỌNG: bỏ Meili .NET SDK (auth GET /tasks bị 401) → tự viết HttpClient thô, gắn Authorization mọi request."
+# - date: "2026-04-01"
+#   task: "Implemented StripeService"
+#   files_modified: [src/payment/stripe.py, tests/test_stripe.py]
+#   pattern_phase: 5
+
+# ── Decisions (architectural, không hiển nhiên từ code) ────────────
+decisions:
+- date: "2026-07-26"
+  decision: "B0 — Lớp CHIẾU (projection) user/role: DB mirror role từ token Keycloak (KHÔNG phải nguồn authz mới). Sync ở GET /me. B1 quản trị user/role = CHỈ ĐỌC (không sửa role trong app); đổi role làm ở Keycloak."
+  reason: "User chốt (Q1 = 'Read-only RBAC + editable taxonomy'). A1a đặt Keycloak là nguồn sự thật cho role (authz đọc realm_access.roles trong token, KeycloakClaimsTransformation.cs). user_roles DB KHÔNG được authz dùng ở prod → nếu để admin UI sửa user_roles sẽ vô tác dụng + gây hiểu lầm. Nhưng B1 viewer + B2 notify CẦN dữ liệu role trong DB → chiếu từ token lúc /me."
+  impact: "UserProvisioningService.SyncAsync upsert user + reconcile user_roles (mirror) mỗi lần /me. /me giờ chạm DB (best-effort projection; nếu muốn robust khi DB down có thể bọc try/catch sau). Chỉ user ĐÃ login mới có trong DB → B1 users list + B2 recipients chỉ thấy người đã đăng nhập (tự lành). tokenRoles/RoleMap là ánh xạ keycloak-role→app-role (đã có ở appsettings Auth:RoleMap + FE tokenRoles.ts). Nếu sau muốn admin UI SỬA role thật → phải tích hợp Keycloak Admin API (đã bàn, chưa làm)."
+- date: "2026-07-26"
+  decision: "B2 — Review reminder (DOC-F-08): recipients = QA_LEAD+ADMIN (RACI Accountable), cửa sổ 30 ngày + quá hạn; dedupe theo (doc,type) trong leadDays ngày; Quartz job daily gated-off ở Testing"
+  reason: "User chốt (Q3 = 'QA_LEAD+ADMIN, 30d + overdue'). Khớp RPT-F-02 (quá hạn/sắp tới hạn). Dedupe tránh spam mỗi ngày. Gated-off Testing theo pattern EffectiveTransitionJob/AuditPartitionMaintenanceJob (test gọi service trực tiếp, deterministic)."
+  impact: "Notification type mới: doc_review_due / doc_review_overdue (bell hiện dùng chung — FE có thể thêm nhãn/icon theo type sau). LeadDaysWarn cấu hình appsettings Review:LeadDaysWarn (mặc định 30). Job quét MỌI doc có next_review_date (kể cả Draft) — hiện chấp nhận; nếu chỉ muốn Effective thì thêm filter sau. Recipients rỗng nếu chưa ai QA_LEAD/ADMIN login (phụ thuộc B0)."
+- date: "2026-07-26"
+  decision: "B1 doc-types làm CHIỀU SÂU: Document.Type enum→string, bảng doc_types là nguồn sự thật, sửa Mapping/Search/ReportService — ✅ ĐÃ LÀM (b1d0). Doc-type code = giá trị wire cũ (canonical string == stored == doc_types.code), giữ 'Work Instruction' có dấu cách để không phá contract/UI"
+  reason: "User chốt 'làm theo chiều sâu, làm chuẩn từ giờ thì sau ít ảnh hưởng'. Cho phép thêm loại tài liệu mới runtime thay vì cố định enum."
+  impact: "RỦI RO CAO: đổi Document.Type (enum DocumentType) sang string sẽ lan ~6 file (Mapping.cs map WorkInstruction↔'Work Instruction', DocumentService.CreateAsync validate, ReportService by_type, SearchService filterable[type], openapi enum, seed). Cần migration AddDocTypes + seed từ enum hiện có + validate type theo bảng active lúc tạo doc. Nên làm ở session tập trung, verify E2E kỹ (đừng vỡ REC/Search/Reports đang xanh)."
+- date: "2026-07-11"
+  decision: "FE dùng lớp mock API (src/api/mock.ts, bật bằng VITE_USE_MOCK=1) cho vertical slice"
+  reason: "Q1/Q2 chốt mock OIDC + docker-compose sau → chạy được S4 end-to-end mà chưa cần BE .NET"
+  impact: "client.ts route sang mock khi cờ bật; gỡ cờ khi cắm qgp-api thật"
+- date: "2026-07-11"
+  decision: "TS types sinh từ openapi.yaml (openapi-typescript → src/api/schema.d.ts), không khai báo tay"
+  reason: "openapi.yaml là single source cho enum/field (governance §8 BUILD_PLAN)"
+  impact: "Chạy `npm run gen:api` mỗi khi openapi.yaml đổi; types.ts chỉ alias components['schemas']"
+- date: "2026-07-11"
+  decision: "Tailwind chỉ map CSS var (tokens.css), không copy giá trị token"
+  reason: "Token = single source từ Claude Design Minimal UI; đổi 1 chỗ"
+  impact: "tokens.css đồng bộ từ design, KHÔNG sửa tay giá trị"
+- date: "2026-07-11"
+  decision: "BE dùng EFCore.NamingConventions (UseSnakeCaseNamingConvention) + schema 'qgp'"
+  reason: "R-SQL: snake_case + không dùng schema public; giảm cấu hình cột thủ công"
+  impact: "Mọi UseNpgsql (Program, DesignTimeFactory, test) phải gọi .UseSnakeCaseNamingConvention() đồng bộ"
+- date: "2026-07-11"
+  decision: "Enum (Status/Type/...) lưu DB dạng text (HasConversion<string>), status có 8 giá trị"
+  reason: "Khớp DDL SDD (status string) + partial-index filter status='Effective'; UnderRevision là state nội bộ (SDD §4.3) ngoài 7 giá trị openapi"
+  impact: "Serializer API sẽ map WorkInstruction↔'Work Instruction' và ẩn UnderRevision ở public API (E1)"
+- date: "2026-07-11"
+  decision: "Test BE trên DbContext.Model metadata (offline), không dùng Postgres"
+  reason: "Docker daemon off; verify config (BR-01/02/07, seed) không cần DB thật"
+  impact: "Seed data + check constraint chỉ có ở DESIGN-TIME model (IDesignTimeModel), KHÔNG ở runtime ctx.Model"
+- date: "2026-07-11"
+  decision: "Auth 2 chế độ: Dev=HS256 mock OIDC (Q1), Prod=OIDC authority (RS256/JWKS); role trong claim 'role', RBAC bằng ASP.NET policy §10.1"
+  reason: "Chưa có IdP thật; dev không chặn build. Server-side authz (SECURITY_RULES) + FE guard defense-in-depth"
+  impact: "Đổi Auth:Mode=Oidc + Auth:OidcAuthority khi cắm SSO thật; FE bỏ VITE_USE_MOCK để login qua /auth/dev-login hoặc OIDC redirect. Khoá dev KHÔNG commit (env QGP_AUTH_SIGNING_KEY hoặc ephemeral)"
+- date: "2026-07-11"
+  decision: "Response envelope theo openapi.yaml (lean), KHÔNG áp R-RESP-STRUCTURE-001 4-field wrapper — ADR-0014"
+  reason: "User chốt + conflict-rule #2 (contract cụ thể đã duyệt thắng rule chung); FE client đã sinh từ openapi"
+  impact: "Whitelist R-RESP-STRUCTURE-001 cho qgp-api khi review; error vẫn {error:{code,message}} code UPPER_SNAKE"
+- date: "2026-07-11"
+  decision: "Nội dung version lưu tạm cột content_markdown (DB) + render content_html bằng Markdig; Git store (content_git_ref) để E1.6"
+  reason: "Chưa tích hợp Git; slice S4 cần content ngay"
+  impact: "Khi làm Git store (E1.6): migrate nội dung sang Git, content_markdown thành cache/loại bỏ"
+- date: "2026-07-25"
+  decision: "Git content store = bare repo local + LibGit2Sharp, COMMIT-ON-PUBLISH (ADR-0015, user chốt phương án A)"
+  reason: "Hiện thực ADR-0001 (docs-as-code) mà KHÔNG cần GitLab (Q2 defer hạ tầng); publish là ranh giới bất biến BR-03. Draft ở DB cho nhanh, commit khi publish."
+  impact: "PublishAsync commit {docId}/{version}.md → set content_git_ref (SHA). content_markdown DB thành working-copy/cache. Nâng cấp sau = git push GitLab, KHÔNG migrate. Repo path: env QGP_GIT_REPO_PATH>config Git:RepoPath>content-repo (gitignored). Prod cần volume bền + backup."
+- date: "2026-07-26"
+  decision: "REC engine (E2.1): rules-based explainable (BR-11, SDD §5.2), DEFER Redis cache 5m; '/' đổi thành HomePage (bỏ redirect→/documents)"
+  reason: "User duyệt cả 2. BR-11 explainable là cốt lõi (reason trả trong API); cache chỉ tối ưu, Redis chưa wire code. BUILD_PLAN quy định S2 = '/' home."
+  impact: "RecommendationService read-only, không cache — nếu tải cao sau này wire Redis + invalidate on {new Effective|major|ack} (§5.2 sequence). Reason string trả nguyên văn tiếng Việt ('Bắt buộc'/'Cần đọc lại'/'Vừa cập nhật'/'Khớp vai trò') → FE map màu badge trong RecCard, KHÔNG i18n lại. '/documents' vẫn route riêng."
+- date: "2026-07-26"
+  decision: "Deployment A1+A2 — Auth thật = Keycloak self-hosted (OIDC); role map từ CLAIM Keycloak (realm_access.roles/groups) → 6 app role; Keycloak vào docker-compose để test local"
+  reason: "User chốt (đợt đưa vào triển khai, blocker #1). AuthSetup.cs đã có sẵn nhánh Auth:Mode=Oidc. IdP = single source of truth cho role. Keycloak open-source, docker được, hợp on-prem QA governance."
+  impact: "BE (không cần dependency mới, dùng JwtBearer sẵn): (1) IClaimsTransformation flatten realm_access.roles → ClaimTypes.Role qua config Auth:RoleMap; (2) appsettings Auth:{Mode,OidcAuthority,Audience,RoleMap}; (3) GATE /auth/dev-login chỉ khi Mode=Dev; (4) docker-compose thêm service keycloak + import realm 'qgp' (client qgp-web public+PKCE, qgp-api audience, roles READER..ADMIN, users mẫu). FE (Hard Stop — cần dependency oidc-client-ts/react-oidc-context): OIDC Authorization Code + PKCE redirect thay mock login → TÁCH thành A1b, xác nhận cài lib trước. Prod: bỏ VITE_USE_MOCK, Auth:Mode=Oidc."
+- date: "2026-07-26"
+  decision: "Phase 2 (E2.2-E2.4): thêm bảng mới additive (learning_paths/path_items/notifications) qua EF migration; Reports để openapi loose + FE local types; serialize test suite"
+  reason: "User cho phép làm tuần tự cả roadmap (bao gồm migration additive không đụng data cũ). Reports response phức tạp/aggregate → additionalProperties đủ, FE dùng interface local (tiền lệ DiffResult). BE test flaky khi thêm 4 test class (audit list top-N bị đẩy khỏi 200 + Meili async) → serialize."
+  impact: "3 migration mới. Notification.DocumentId có FK Document CASCADE (xoá doc dọn notification). tests/xunit.runner.json parallelizeTestCollections=false (BE test giờ tuần tự ~16-20s, deterministic). Cần dotnet-ef global (đã cài 8.0.29). Notification sinh cho audience = user_roles ∩ doc_audience_roles (dev sparse vì chưa gán role thật)."
+- date: "2026-07-26"
+  decision: "A7-OTel dùng ISC.Observability 1.2.2 (SDK FPT do user cấp); gate theo Otel:OtlpEndpoint (off khi rỗng + off ở Testing); GIỮ QgpExceptionHandler (ADR-0014) — UseStandardObservability đặt NGOÀI UseExceptionHandler"
+  reason: "User ban hành package nội bộ (không dùng OpenTelemetry chuẩn rời rạc). Gate để dev/test không nhiễu + không cần collector. ISC có global exception handling riêng nhưng QGP có envelope contract ADR-0014 (có test) → đặt UseStandardObservability ngoài UseExceptionHandler để QGP handler (inner) sở hữu body lỗi; đã VERIFY 404 vẫn {error:{code,message}} + ISC log exception kèm TraceId."
+  impact: "Prod bật OTLP: set Otel__OtlpEndpoint=http://otel-collector:4317 (compose api đã map env OTEL_OTLP_ENDPOINT). Cần deploy collector + Grafana stack (ADR-0013) để nhận. Cờ instrument: EnableEntityFramework/Quartz=true, còn lại false (khớp stack). Log giờ là Serilog JSON (ServiceName/TraceId/SpanId) khi bật. ISC.Observability kéo theo OpenTelemetry.* + Serilog.* (transitive)."
+- date: "2026-07-26"
+  decision: "A5-A7 hardening: rate limit off mặc định ở Testing (opt-in cho test) · secret ưu tiên file /run/secrets (Vault Agent) qua AddKeyPerFile · OTel dùng SDK nội bộ FPT (chưa cài lib chuẩn)"
+  reason: "Rate limit ON trong suite gây nhiễu (nhiều request/class + env leak PermitLimit giữa test) → default off ở Testing, prod/dev vẫn on. File-secrets khớp ADR-0012 (Vault Agent render file) mà không thêm dependency. User có OTel SDK riêng ban hành cho FPT → chờ package, không cài OpenTelemetry chuẩn để tránh trùng/xung đột."
+  impact: "Prod bật rate limit (RateLimit__Enabled mặc định true ngoài Testing). Vault Agent ghi /run/secrets/<Key> (dùng '__' nesting) → BE tự nạp, ưu tiên cao nhất. OTel: khi có package FPT → wire Program.cs (traces+metrics OTLP, bật theo OTEL_EXPORTER_OTLP_ENDPOINT). ForwardedHeaders Clear KnownProxies → CHỈ an toàn khi ingress duy nhất là nginx (đừng expose API trực tiếp)."
+- date: "2026-07-26"
+  decision: "A1b: FE dùng react-oidc-context + oidc-client-ts (MIT); bật OIDC bằng env VITE_OIDC_AUTHORITY (không thay hẳn mock); giữ nguyên surface useAuth(); roles decode từ ACCESS token client-side"
+  reason: "react-oidc-context là chuẩn de-facto cho React (authts), tự lo PKCE/refresh/callback → ít code, ít sai. Env-toggle giữ vertical-slice offline (mock) + dev-login cũ chạy song song, không phá test. Giữ useAuth() surface → guards/pages/client.ts/test KHÔNG đổi. realm_access nằm ở access token (không phải ID token) nên decode access token."
+  impact: "3 mode FE: npm run dev (mock) · dev:real (dev-login BE) · dev:oidc (Keycloak thật). OidcAuthProvider PHẢI nằm trong <AuthProvider> react-oidc-context (App bọc khi OIDC_ENABLED). Token sync vào localStorage qgp.access_token → client.ts dùng như cũ. tokenRoles.KEYCLOAK_ROLE_MAP phải KHỚP BE Auth:RoleMap (đổi 1 nơi nhớ đổi cả 2). Prod: build với VITE_OIDC_AUTHORITY=<https realm>, VITE_OIDC_CLIENT_ID, VITE_USE_MOCK=0; redirect_uri/webOrigins Keycloak phải khớp origin prod. Chưa xử lý 401→re-login tự động (access token 15' có automaticSilentRenew; nếu refresh fail vẫn phải login lại) — để hardening."
+- date: "2026-07-26"
+  decision: "A1a hiện thực: role Keycloak realm lowercase (reader..admin) → app role qua ClaimsTransformation đọc realm_access.roles; Oidc mode dùng authority làm ValidIssuer (không hardcode); Auth:RequireHttpsMetadata=true mặc định (local Keycloak http → false)"
+  reason: "Keycloak để realm role trong claim realm_access.roles (JSON), KHÔNG phải claim 'role' phẳng → cần IClaimsTransformation. iss token = URL realm (đã verify token thật) nên ValidIssuer phải = authority. RequireHttpsMetadata bảo mật mặc định true nhưng Keycloak dev chạy http."
+  impact: "Bật Oidc prod: set Auth:Mode=Oidc + Auth:OidcAuthority=<realm https url> + Auth:RequireHttpsMetadata=true (prod https) hoặc false (local http). RoleMap trong appsettings map keycloak-role→app-code; đổi tên role IdP chỉ sửa RoleMap, không sửa code. /auth/dev-login TỰ tắt (404) khi Mode≠Dev (DevTokenIssuer không đăng ký + [FromServices]). realm-qgp.json chỉ DEV (user/pass mẫu Password123!, admin/admin) — PROD phải tạo realm riêng, KHÔNG import file này."
+# - date: "2026-04-01"
+#   decision: "Dùng idempotency_key cho webhook dedup"
+#   reason: "Stripe có thể gửi duplicate events"
+#   impact: "Requires column in webhook_events table"
+
+# ── Known gotchas (workaround cho hành vi bất ngờ) ─────────────────
+known_gotchas:
+- discovery: "openapi.yaml của project là OpenAPI 3.1 — Redocly (chạy trong .gitlab-ci validate) REJECT 'nullable: true' (3.0 syntax) VÀ yêu cầu MỖI operation có ít nhất 1 response 4xx."
+  workaround: "3.1: bỏ 'nullable', nếu cần null dùng type array (vd type: [string, 'null']). Mỗi path operation thêm 1 response 4xx (vd '403'/'404' $ref '#/components/responses/DefaultError'). Verify: npx @redocly/cli lint product-spec/api/openapi.yaml."
+  files_affected: [product-spec/api/openapi.yaml]
+  discovered_at: "2026-07-26"
+- discovery: "Loại tài liệu (Type) GIỜ là string tự do backed by bảng doc_types (B1 chiều sâu), KHÔNG còn enum DocumentType. documents.type lưu code = giá trị wire ('Process'... 'Work Instruction' có dấu cách). Tạo doc validate type theo doc_types.active."
+  workaround: "Thêm loại mới: POST /v1/admin/doc-types (không sửa code/enum). code doc_type BẤT BIẾN (PATCH chỉ label/seq/active). Meili filter[type] + ReportService by_type dùng chính chuỗi code. Nếu seed thêm loại → HasData trong QgpDbContext.SeedDocTypes + migration."
+  files_affected: [apps/api/src/Qgp.Api/Domain/Entities/DocType.cs, apps/api/src/Qgp.Api/Infrastructure/Persistence/QgpDbContext.cs, apps/api/src/Qgp.Api/Application/AdminService.cs]
+  discovered_at: "2026-07-26"
+- discovery: "DocumentDetail (getDocument) KHÔNG chứa version UUID, nhưng acknowledgeVersion(id) cần UUID"
+  workaround: "Gọi listVersions() song song, chọn bản Effective (version==effective_version, fallback status Effective) lấy id → truyền cho AckButton (useDocument.ts)"
+  files_affected: [apps/web/src/features/documents/useDocument.ts, apps/web/src/api/client.ts]
+  discovered_at: "2026-07-11"
+  note: "Cân nhắc bổ sung effective_version_id vào DocumentDetail trong openapi.yaml ở vòng sau (giảm 1 round-trip)"
+- discovery: "Bash/Edit/Write tool bị kẹt cwd tại subfolder sau khi PowerShell Set-Location vào đó → hooks (đường dẫn tương đối .claude/hooks) fail, block tool"
+  workaround: "Cuối MỖI lệnh PowerShell cần cwd con (vd dotnet ef trong apps/api), thêm `Set-Location <repo-root>` để reset cwd chung → Edit/Write/Bash hoạt động lại"
+  files_affected: []
+  discovered_at: "2026-07-11"
+- discovery: "EF Core 8: ctx.Model (runtime model) LƯỢC BỎ seed data + check constraints (design-time metadata). Index/schema vẫn giữ."
+  workaround: "Test/inspect seed & check constraint qua ctx.GetService<IDesignTimeModel>().Model, không dùng ctx.Model"
+  files_affected: [apps/api/tests/Qgp.Api.Tests/QgpDbContextTests.cs]
+  discovered_at: "2026-07-11"
+- discovery: "audit_logs.actor_id hiện để NULL (E1.1) — actor sso_subject nhét vào cột action string, chưa map sang user_id"
+  workaround: "E1 sau: resolve/insert User theo sso_subject rồi set actor_id; hoặc dùng AuditService nâng cấp"
+  files_affected: [apps/api/src/Qgp.Api/Application/AuditService.cs]
+  discovered_at: "2026-07-11"
+- discovery: "DevDataSeeder chỉ chạy khi ASPNETCORE_ENVIRONMENT=Development; test factory (QgpApiFactory) dùng 'Testing' để không auto-seed. Integration test (DocLifecycleTests) CẦN Postgres up."
+  workaround: "Chạy `docker compose -f deploy/docker-compose.yml up -d` trước `dotnet test`; app dev tự seed QA-PROC-005"
+  files_affected: [apps/api/src/Qgp.Api/Program.cs, apps/api/tests/Qgp.Api.Tests/QgpApiFactory.cs]
+  discovered_at: "2026-07-11"
+- discovery: "Chạy `dotnet apps/api/.../Qgp.Api.dll` TỪ REPO ROOT → content root = repo root → KHÔNG nạp appsettings.json (ở apps/api/src/Qgp.Api) → Meili:ApiKey null → 401. Tests + `dotnet run` từ project dir thì OK."
+  workaround: "Smoke dll thủ công: set env QGP_MEILI_KEY (và QGP_DB_CONNECTION); hoặc chạy `dotnet run --project apps/api/src/Qgp.Api`. Prod: QGP_MEILI_KEY qua env/Vault."
+  files_affected: []
+  discovered_at: "2026-07-13"
+- discovery: "Meilisearch .NET SDK 0.15.5: WaitForTask→GetTask (GET /tasks) KHÔNG gửi API key → 401 (Add/Search thì authed per-request). Gây reindex fail."
+  workaround: "Bỏ SDK, viết MeiliSearchIndex bằng HttpClient thô (typed AddHttpClient) gắn Authorization vào DefaultRequestHeaders → mọi request kể cả /tasks đều authed."
+  files_affected: [apps/api/src/Qgp.Api/Infrastructure/Search/MeiliSearchIndex.cs]
+  discovered_at: "2026-07-13"
+- discovery: "SearchTests flaky: search NGAY sau publish đôi khi rỗng vì Meili index BẤT ĐỒNG BỘ (task 202, eventual consistency). Git commit khi publish thêm I/O làm lộ timing. KHÔNG phải lỗi git."
+  workaround: "Test poll /v1/search tối đa ~3s (15×200ms) tới khi doc xuất hiện rồi mới assert. Prod chấp nhận eventual (best-effort index, /admin/reindex sửa drift)."
+  files_affected: [apps/api/tests/Qgp.Api.Tests/SearchTests.cs]
+  discovered_at: "2026-07-25"
+- discovery: "BE dev port thực tế = :5048 (launchSettings http profile), KHÔNG phải :8080. `dotnet run` LUÔN dùng launchSettings.applicationUrl → ASPNETCORE_URLS env bị bỏ qua (trừ khi thêm --no-launch-profile). Port :8080 (memory cũ) chỉ đúng khi chạy DLL trực tiếp + hiện bị kind cluster obs-ref chiếm trên máy này."
+  workaround: "Chạy BE dev: `dotnet run --project apps/api/src/Qgp.Api/Qgp.Api.csproj` (env ASPNETCORE_ENVIRONMENT=Development để seed+dev-login). Vite proxy default → :5048; override VITE_API_PROXY_TARGET nếu chạy port khác. Real mode FE: `npm run dev:real` (.env.real, VITE_USE_MOCK=0)."
+  files_affected: [apps/web/vite.config.ts, apps/web/.env.real, apps/api/src/Qgp.Api/Properties/launchSettings.json]
+  discovered_at: "2026-07-25"
+- discovery: "EF Core Database.SqlQuery<T>/SqlQueryRaw COMPOSE SQL thành subquery (SELECT ... FROM (<sql>)) → INSERT/DDL trong đó FAIL. Dùng cho INSERT…ON CONFLICT phải là ExecuteSqlInterpolatedAsync (chạy trực tiếp), rồi SELECT id riêng."
+  workaround: "AuditService.ResolveActorIdAsync: ExecuteSqlInterpolatedAsync(INSERT … ON CONFLICT (sso_subject) DO NOTHING) rồi await db.Users.Where(...).Select(id).FirstAsync — race-safe, không đụng pending changes của caller (không premature-commit)."
+  files_affected: [apps/api/src/Qgp.Api/Application/AuditService.cs]
+  discovered_at: "2026-07-25"
+- discovery: "Bản thiết kế UI đọc được là `product-spec/DESIGN_BRIEF_QGP_v0.1.md` (screen inventory §5, design-system §8 component PascalCase, states §7, a11y §10). File `product-spec/ui-design/*.html` là PROTOTYPE BUNDLE MÃ HOÁ (JS unpack runtime) — KHÔNG grep/đọc screen trực tiếp được. Token/palette Minimal UI (#00A76F/#C8FAD6/#5BE49B/#004B50, font Inter) đã đồng bộ vào apps/web/src/theme/tokens.css từ Phase 1."
+  workaround: "TRƯỚC khi dựng/ sửa màn FE → ĐỌC DESIGN_BRIEF §5 (map màn→API) + §8 (tên component chuẩn: DocumentCard/RecommendationPanel/LearningPathChecklist/DashboardTile/BarChart/AuditTable/AppNav...) để đặt tên & scope đúng. Đừng chỉ tái dùng pattern có sẵn mà bỏ qua brief."
+  files_affected: [product-spec/DESIGN_BRIEF_QGP_v0.1.md, apps/web/src/theme/tokens.css]
+  discovered_at: "2026-07-26"
+- discovery: "BE integration test flaky khi chạy song song nhiều test class (audit list dùng limit=200 bị đẩy khỏi top-N do audit ghi đồng thời; Meili index async). Thêm 4 test class Phase 2 làm lộ rõ."
+  workaround: "apps/api/tests/Qgp.Api.Tests/xunit.runner.json { parallelizeTestCollections:false } + <None Include> copy to output → test chạy tuần tự (deterministic, ~16-20s). KHÔNG sửa assertion mong manh riêng lẻ (root cause = shared Postgres/Meili)."
+  files_affected: [apps/api/tests/Qgp.Api.Tests/xunit.runner.json, apps/api/tests/Qgp.Api.Tests/Qgp.Api.Tests.csproj]
+  discovered_at: "2026-07-26"
+- discovery: "dotnet-ef global tool CHƯA cài trên máy này (migration Phase 2 cần). Cài: dotnet tool install --global dotnet-ef --version 8.*"
+  workaround: "Sau cài, thêm $env:USERPROFILE\\.dotnet\\tools vào PATH trong cùng lệnh PowerShell (session mới chưa có). dotnet ef migrations add <Name> --project + --startup-project trỏ Qgp.Api.csproj. STOP process dotnet Qgp.Api đang chạy trước khi build/migration (lock exe)."
+  files_affected: []
+  discovered_at: "2026-07-26"
+- discovery: "audit_logs GIỜ là partitioned table RANGE(at) theo tháng (PK (id,at)). Tạo partition cho tháng ĐÃ có rows trong DEFAULT sẽ FAIL (overlap default) → phải tạo TRƯỚC khi có row. Quartz AuditPartitionMaintenanceJob (StartNow + daily, monthsAhead=2, CREATE TABLE IF NOT EXISTS) lo việc này. audit.LogAsync luôn set At=UtcNow (đúng partition key). Test parallel share sso_subject 'tester@fpt' → user upsert race-safe nên OK."
+  workaround: "Thêm partition tương lai qua AuditPartitionService, KHÔNG ALTER trực tiếp. Query partition của 1 row: a.tableoid::regclass (phải table-qualified)."
+  files_affected: [apps/api/src/Qgp.Api/Infrastructure/Persistence/Migrations/20260725050536_PartitionAuditLogs.cs, apps/api/src/Qgp.Api/Application/AuditPartitionService.cs, apps/api/src/Qgp.Api/Infrastructure/Scheduling/AuditPartitionMaintenanceJob.cs]
+  discovered_at: "2026-07-25"
+- discovery: "Test WebApplicationFactory KHÔNG override được config mà Program đọc lúc ĐĂNG KÝ service (vd Auth:Mode). ConfigureAppConfiguration áp lúc Build() = quá muộn. Keycloak health cũng KHÔNG ở port http chính (KC26: management port 9000)."
+  workaround: "Override qua ENV VAR (Auth__Mode…) set trong ctor factory, dọn ở Dispose (suite serialized nên không leak). Poll Keycloak sẵn sàng qua realm discovery /.well-known/openid-configuration (KHÔNG /health — ở 9000 không expose). KC26 boot + import realm ~1-2 phút lần đầu (pull image)."
+  files_affected: [apps/api/tests/Qgp.Api.Tests/OidcModeAuthTests.cs, deploy/docker-compose.yml]
+  discovered_at: "2026-07-26"
+- discovery: "BE .NET crash lúc start với Npgsql 'Timeout during reading attempt' / 'transient failure' DÙ Postgres healthy (docker exec psql OK, chỉ 6/100 conn, TCP host→127.0.0.1:5432 connect 10ms). Nguyên nhân: connection string 'Host=localhost' → Windows resolve IPv6 '::1' trước; port-forward IPv6 [::]:5432 của Docker Desktop bị flaky (TCP connect được nhưng handshake đọc treo) sau đợt docker build/run image. Test suite chạy trước đó OK vì forward chưa degrade."
+  workaround: "Dùng 'Host=127.0.0.1' (ép IPv4) trong QGP_DB_CONNECTION khi chạy BE dev. Đã cập nhật RUN-LOCAL.md Bước 2. Nếu vẫn lỗi: docker restart qgp-postgres. (Trong container/compose không gặp vì dùng service name 'postgres'.)"
+  files_affected: [RUN-LOCAL.md]
+  discovered_at: "2026-07-26"
+- discovery: "FE OIDC (A1b): react-oidc-context lưu user ở sessionStorage của NÓ; app cần token ở localStorage['qgp.access_token'] cho client.ts. OidcAuthProvider PHẢI nằm trong <AuthProvider> của react-oidc-context, nếu không useAuth() của lib throw. Callback (?code&state) xử lý tự động khi app load ở redirect_uri = origin+'/'; phải render splash khi oidc.isLoading nếu không RequireAuth sẽ nháy sang /login trước khi user set."
+  workaround: "OidcAuthProvider useEffect sync accessToken→localStorage qgp.access_token (client.ts đọc); App bọc react-oidc-context AuthProvider khi OIDC_ENABLED; onSigninCallback dọn query khỏi URL. Test adapter: vi.mock('react-oidc-context') trả useAuth giả (xem oidcAuth.test.tsx)."
+  files_affected: [apps/web/src/auth/AuthContext.tsx, apps/web/src/auth/oidcConfig.ts, apps/web/src/App.tsx]
+  discovered_at: "2026-07-26"
+- discovery: "Keycloak sub (claim định danh) = UUID cố định của user, KHÔNG phải username. preferred_username mới là 'author1'. NameClaimType hiện = 'sub' → User.sso_subject sẽ là UUID. Token thật: aud=qgp-api (nhờ audience mapper trên client qgp-web), realm_access.roles=[reader,author...]."
+  workaround: "sso_subject dùng UUID (ổn định, đúng ý nghĩa). Nếu cần hiển thị tên/email → đọc claim preferred_username/email/name (provisioning user ở A1b/sau). PowerShell 5.1 Invoke-RestMethod tới Keycloak hay 'connection closed' do keep-alive → dùng -DisableKeepAlive + retry."
+  files_affected: [apps/api/src/Qgp.Api/Auth/KeycloakClaimsTransformation.cs, deploy/keycloak/realm-qgp.json]
+  discovered_at: "2026-07-26"
+# - discovery: "additions/deletions chỉ có ở single MR endpoint"
+#   workaround: "Gọi GET /projects/:id/merge_requests/:iid riêng"
+#   files_affected: [src/extraction/merge_requests.py]
+#   discovered_at: "2026-04-02"
+
+# ── Pending tasks (carry-over giữa session) ────────────────────────
+pending_tasks:
+# ✅ Phase 1 MVP DONE. ✅ Phase 2 DONE. ✅ A1 Auth thật (A1a BE + A1b FE OIDC) DONE (2026-07-26). Roadmap tiếp:
+# 🚀 ĐANG LÀM (deployment go-live): A3+A4 đóng gói + hạ tầng
+# ✅ A1b MANUAL verify DONE (2026-07-26): user tự click-through SSO trên browser → đăng nhập THẬT qua Keycloak OK.
+#    Gotcha đã phát/giải cho user: bấm SSO không nhảy trang nếu mở bằng IP (127.0.0.1/LAN) thay vì localhost (crypto.subtle/PKCE bị chặn ngoài secure context). Discovery+token endpoint Keycloak có CORS cho :5173 (webOrigins). Runbook đầy đủ: RUN-LOCAL.md (gốc repo) — tài khoản mẫu + cách bật BE(OIDC)/FE(dev:oidc)/Keycloak + troubleshooting.
+# --- các hạng mục go-live còn lại (Nhóm A/B) ---
+# ✅ TOÀN BỘ NHÓM A DONE (2026-07-26): A1 auth · A3+A4 đóng gói · A5 secrets · A6 backup · A7 bảo mật+OTel. Xem DEPLOY.md + SECRETS.md + deploy/backup/.
+# ✅ B1 (Admin/S17) + B2 (review reminders DOC-F-08) DONE 2026-07-26 — xem completed_tasks.
+- description: "B3/B5 gap nghiệp vụ còn lại: (B3) email/thông báo ngoài app · (B5) access report event tracking thật (doc_viewed/search_performed thay proxy ack) · B1 follow-up: màn sửa audience per-document (BE + test xong, UI đặt ở DocumentPage — task_tracker b1c1)"
+  priority: medium
+  blocked_by: ""
+- description: "Go-live còn lại (nhỏ, ops): bật CSP nginx (điền origin Keycloak vào connect-src) · tự động hoá `dotnet ef database update` khi deploy (job CI/entrypoint) · Keycloak prod hardening (DB ngoài, KC_HOSTNAME, TLS) · chuyển secret .env.prod → Vault thật · deploy OTel collector + Grafana stack (Prometheus/Tempo/Loki) để nhận OTLP."
+  priority: low
+  blocked_by: ""
+- description: "Phase 3 — E3.1 qgp-rag Python (FastAPI+pgvector, ingest Effective, /query per qgp-rag.openapi.yaml) · E3.2 BOT chat S18 (citation, kill switch)"
+  priority: low
+  blocked_by: ""
+- description: "Hardening — OIDC provider thật (thay mock) · GitLab CI + git push content-repo (ADR-0011) · Vault secrets · OpenTelemetry wiring · logo brand thật"
+  priority: low
+  blocked_by: ""
+- description: "Git store nice-to-have: backup/retention repo content-repo; cân nhắc diff/read từ Git blob thay content_markdown DB (E1.5 hiện đọc DB)"
+  priority: low
+  blocked_by: ""
+# - description: "Implement retry logic cho webhook failures"
+#   priority: medium
+#   blocked_by: ""
+
+# ── Hallucination history (do `/halluc-score --save` ghi) ──────────
+# Track HRS theo session để spot trend (pattern recurring → fix root cause)
+# Keep last 50 entries (auto-truncate trong halluc-score script)
+hallucination_history: []
+# - date: "2026-04-15"
+#   session: 12
+#   hrs: 0.62
+#   dominant_signal: schema_match
+#   signals:
+#     cite_coverage: 0.6
+#     schema_match: 0.0
+#     confidence_density: 1.2
+#     static_errors: 0
+#     context_drift: 0.81
+#     failures: 1
+#     schema_staleness: 12

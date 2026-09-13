@@ -1,0 +1,1786 @@
+openapi: 3.1.0
+info:
+  title: QGP — Quality Governance Portal API
+  version: 0.1.0
+  description: |
+    Public REST API cho QGP (qgp-api, .NET 8). Sinh từ SDD-QGP-001 §3, map từ PRD-QGP-001 v1.0. Base path /v1. Auth Bearer (OIDC). Verb unsafe cần header Idempotency-Key. Error code theo ISC Internal Standard — API & Error Code.
+  contact:
+    name: QGP Engineering (SA/TL)
+  license:
+    name: Proprietary — FPT ISC (internal)
+    url: https://internal.fpt/legal
+servers:
+- url: https://qgp.internal.fpt/v1
+  description: Prod (nội bộ)
+- url: https://staging.qgp.internal.fpt/v1
+  description: Staging
+security:
+- bearerAuth: []
+tags:
+- name: Documents
+  description: Quản trị tài liệu & vòng đời
+- name: Versions
+  description: Phiên bản, phê duyệt, ban hành, acknowledgement
+- name: Search
+  description: Tra cứu full-text
+- name: Recommendations
+  description: Gợi ý tài liệu theo role
+- name: Onboarding
+  description: Lộ trình học theo role + tiến độ đọc
+- name: Notifications
+  description: Thông báo trong ứng dụng (bell)
+- name: Subscriptions
+  description: Theo dõi tài liệu
+- name: Feedback
+  description: Phản hồi & triage
+- name: Reports
+  description: Báo cáo quản trị (aggregate)
+- name: Audit
+  description: Truy vết audit log
+- name: Admin
+  description: Quản trị hệ thống S17 — RBAC (read-only) + taxonomy (tag, loại tài liệu, audience)
+- name: Assistant
+  description: Trợ lý AI (RAG, P3)
+paths:
+  /documents:
+    get:
+      tags:
+      - Documents
+      summary: Danh sách / filter tài liệu (KB-F-03)
+      operationId: listDocuments
+      parameters:
+      - $ref: '#/components/parameters/Query'
+      - $ref: '#/components/parameters/FilterType'
+      - $ref: '#/components/parameters/FilterTag'
+      - $ref: '#/components/parameters/FilterStatus'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Trang tài liệu
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/DocumentSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+      - Documents
+      summary: Tạo tài liệu với metadata (DOC-F-01, UC-01)
+      operationId: createDocument
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Đã tạo (Draft)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Trùng doc_id (BR-01)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /documents/{doc_id}:
+    get:
+      tags:
+      - Documents
+      summary: Lấy bản Effective + badge trạng thái (DOC-F-12, UC-07/08)
+      operationId: getDocument
+      parameters:
+      - $ref: '#/components/parameters/DocId'
+      responses:
+        '200':
+          description: Tài liệu (bản Effective hoặc cảnh báo non-Effective)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /documents/{doc_id}/versions:
+    get:
+      tags:
+      - Versions
+      summary: Lịch sử phiên bản (DOC-F-06, UC-09)
+      operationId: listVersions
+      parameters:
+      - $ref: '#/components/parameters/DocId'
+      responses:
+        '200':
+          description: Danh sách version
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentVersion'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+    post:
+      tags:
+      - Versions
+      summary: Tạo revision minor/major (DOC-F-02, UC-05/06)
+      operationId: createVersion
+      parameters:
+      - $ref: '#/components/parameters/DocId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVersionRequest'
+      responses:
+        '201':
+          description: Version mới (Draft/UnderRevision)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVersion'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /documents/{doc_id}/diff:
+    get:
+      tags:
+      - Versions
+      summary: Diff giữa 2 version (DOC-F-06)
+      operationId: getDiff
+      parameters:
+      - $ref: '#/components/parameters/DocId'
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+        description: version nguồn (vd 2.0)
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+        description: version đích (vd 2.1)
+      responses:
+        '200':
+          description: Kết quả diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from:
+                    type: string
+                  to:
+                    type: string
+                  diff:
+                    type: string
+                    description: unified diff nội dung
+                  change_summary:
+                    type: string
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /versions/{id}/submit:
+    post:
+      tags:
+      - Versions
+      summary: Submit review (DOC-F-04, UC-01) — Draft → InReview
+      operationId: submitVersion
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/VersionOk'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+  /versions/{id}/approve:
+    post:
+      tags:
+      - Versions
+      summary: Approve / Reject kèm nhận xét (DOC-F-04, UC-02)
+      operationId: approveVersion
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - decision
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - approve
+                  - reject
+                comment:
+                  type: string
+                  maxLength: 1000
+                  description: bắt buộc khi reject
+      responses:
+        '200':
+          $ref: '#/components/responses/VersionOk'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StateConflict'
+  /versions/{id}/publish:
+    post:
+      tags:
+      - Versions
+      summary: Publish với ngày ban hành/áp dụng (DOC-F-03, UC-03, BR-04/BR-07)
+      operationId: publishVersion
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+            examples:
+              future_effective:
+                summary: effective_date tương lai (Approved ≠ Effective)
+                value:
+                  issue_date: '2026-07-01'
+                  effective_date: '2026-07-15'
+                  change_summary: Cap nhat tieu chi Quality Gate 1
+      responses:
+        '200':
+          description: Đã publish
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Version đã publish — bất biến (BR-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Thiếu change_summary (BR-04) hoặc effective_date < issue_date (BR-07)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /versions/{id}/acknowledge:
+    post:
+      tags:
+      - Versions
+      summary: Xác nhận đã đọc tài liệu bắt buộc (DOC-F-09, UC-10)
+      operationId: acknowledgeVersion
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Đã ghi nhận acknowledgement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Acknowledgement'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /versions/{id}/content:
+    get:
+      tags:
+      - Versions
+      summary: Đọc nội dung markdown của version để soạn/sửa (DOC-F-02, S7). RBAC doc.author.
+      operationId: getVersionContent
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: Nội dung version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionContent'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Versions
+      summary: Cập nhật nội dung draft (DOC-F-02, S7). Chỉ Draft/UnderRevision (BR-03). RBAC doc.author.
+      operationId: updateVersionContent
+      parameters:
+      - $ref: '#/components/parameters/VersionId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContentRequest'
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionContent'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Version đã ban hành — bất biến (BR-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /review-queue:
+    get:
+      tags:
+      - Versions
+      summary: Hàng đợi duyệt — version đang InReview (DOC-F-04, UC-02, S9). RBAC doc.approve.
+      operationId: listReviewQueue
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - InReview
+          - Approved
+          default: InReview
+        description: InReview=chờ duyệt (S9), Approved=chờ ban hành (S8)
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Danh sách version chờ duyệt (cũ nhất trước)
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ReviewQueueItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /search:
+    get:
+      tags:
+      - Search
+      summary: Full-text + filter, < 1s (KB-F-03, NFR-02)
+      operationId: search
+      parameters:
+      - $ref: '#/components/parameters/Query'
+      - $ref: '#/components/parameters/FilterTag'
+      - $ref: '#/components/parameters/FilterType'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Kết quả tìm kiếm (chỉ tài liệu Effective — BR-06)
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/SearchHit'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /recommendations:
+    get:
+      tags:
+      - Recommendations
+      summary: Goi y Tai lieu danh cho ban theo role (REC-F-02, UC-23)
+      operationId: getRecommendations
+      description: Gợi ý explainable — chỉ tài liệu Effective trong quyền đọc (BR-11).
+      responses:
+        '200':
+          description: Nhóm bắt buộc + gợi ý
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recommendations'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /onboarding:
+    get:
+      tags:
+      - Onboarding
+      summary: Lộ trình học theo role + tiến độ đọc (ONB-F-01/02/04, S12)
+      operationId: getOnboarding
+      description: Lộ trình gộp theo role của user; mỗi item kèm trạng thái đã đọc (acked) — nối DOC-F-09.
+      responses:
+        '200':
+          description: Lộ trình + tiến độ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Onboarding'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /notifications:
+    get:
+      tags:
+      - Notifications
+      summary: Hộp thư thông báo của user (ADM-F-04, S19)
+      operationId: listNotifications
+      parameters:
+      - name: unread_only
+        in: query
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Danh sách + số chưa đọc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationList'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /notifications/{id}/read:
+    post:
+      tags:
+      - Notifications
+      summary: Đánh dấu 1 thông báo đã đọc (ADM-F-04)
+      operationId: markNotificationRead
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Thông báo đã đọc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /notifications/read-all:
+    post:
+      tags:
+      - Notifications
+      summary: Đánh dấu tất cả đã đọc (ADM-F-04)
+      operationId: markAllNotificationsRead
+      responses:
+        '200':
+          description: Số thông báo đã cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /subscriptions:
+    get:
+      tags:
+      - Subscriptions
+      summary: Danh sách tài liệu đang theo dõi (ADM-F-04, S19)
+      operationId: listSubscriptions
+      responses:
+        '200':
+          description: Trang subscription
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Subscription'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /documents/{docId}/subscribe:
+    post:
+      tags:
+      - Subscriptions
+      summary: Theo dõi tài liệu (S19)
+      operationId: subscribeDocument
+      parameters:
+      - name: docId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Trạng thái theo dõi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionStatus'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+    delete:
+      tags:
+      - Subscriptions
+      summary: Bỏ theo dõi tài liệu (S19)
+      operationId: unsubscribeDocument
+      parameters:
+      - name: docId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Trạng thái theo dõi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionStatus'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /feedback:
+    get:
+      tags:
+      - Feedback
+      summary: Danh sách feedback để triage (FBK-F-03, S14) — QA
+      operationId: listFeedback
+      parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/FeedbackStatus'
+      - name: category
+        in: query
+        schema:
+          $ref: '#/components/schemas/FeedbackCategory'
+      - name: doc_id
+        in: query
+        schema:
+          type: string
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Trang feedback
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Feedback'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Feedback
+      summary: Gửi feedback in-context (FBK-F-01, UC-15)
+      operationId: createFeedback
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedbackRequest'
+      responses:
+        '201':
+          description: Đã tạo feedback (New)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feedback'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /feedback/{id}:
+    patch:
+      tags:
+      - Feedback
+      summary: Triage feedback (FBK-F-03) — QA
+      operationId: triageFeedback
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  $ref: '#/components/schemas/FeedbackStatus'
+                note:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feedback'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /reports/issuance:
+    get:
+      tags:
+      - Reports
+      summary: Thống kê tài liệu ban hành (RPT-F-01, UC-22)
+      operationId: getIssuanceReport
+      responses:
+        '200':
+          description: Số liệu aggregate
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /reports/compliance:
+    get:
+      tags:
+      - Reports
+      summary: Compliance acknowledgement (RPT-F-04)
+      operationId: getComplianceReport
+      responses:
+        '200':
+          description: Tỉ lệ ack + ai chưa đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /reports/feedback:
+    get:
+      tags:
+      - Reports
+      summary: Thống kê feedback (RPT-F-05)
+      operationId: getFeedbackReport
+      responses:
+        '200':
+          description: Feedback theo trạng thái + thời gian xử lý TB
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /reports/access:
+    get:
+      tags:
+      - Reports
+      summary: Truy cập proxy theo ack (RPT-F-03) — aggregate
+      operationId: getAccessReport
+      responses:
+        '200':
+          description: Top engaged + tài liệu chưa ai đọc + note giới hạn
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /audit:
+    get:
+      tags:
+      - Audit
+      summary: Truy vết audit log (ADM-F-03, UC-21, NFR-03)
+      operationId: listAudit
+      parameters:
+      - name: document_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Trang audit
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AuditEntry'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /assistant/query:
+    post:
+      tags:
+      - Assistant
+      summary: Hỏi–đáp BOT có trích nguồn (P3 — BOT, UC-17/18)
+      operationId: askAssistant
+      description: Proxy tới qgp-rag. Không citation → không trả lời (BOT-F-03/04). Xem contract qgp-rag.openapi.yaml.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - question
+              properties:
+                question:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                lang:
+                  type: string
+                  enum:
+                  - vi
+                  - en
+                  default: vi
+      responses:
+        '200':
+          description: Câu trả lời (có citation) hoặc 'không chắc'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantAnswer'
+        '503':
+          description: BOT tắt (kill switch) hoặc qgp-rag không sẵn sàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          $ref: '#/components/responses/DefaultError'
+  /admin/rbac:
+    get:
+      tags:
+      - Admin
+      summary: Ma trận phân quyền §10.1 (read-only, ADM-F-01)
+      description: Chỉ để xem. Gán vai trò cho người dùng thực hiện ở IdP (Keycloak) — nguồn authz thật.
+      operationId: getRbac
+      responses:
+        '200':
+          description: Ma trận RBAC (roles + policies)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/DefaultError'
+  /admin/users:
+    get:
+      tags:
+      - Admin
+      summary: Danh sách người dùng + vai trò (lớp chiếu B0, ADM-F-01)
+      operationId: listAdminUsers
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Trang người dùng
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/DefaultError'
+  /admin/tags:
+    get:
+      tags:
+      - Admin
+      summary: Danh sách tag (ADM-F-02)
+      operationId: listTags
+      responses:
+        '200':
+          description: Trang tag
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/DefaultError'
+    post:
+      tags:
+      - Admin
+      summary: Tạo tag mới
+      operationId: createTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - slug
+              - name
+              properties:
+                slug:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '409':
+          $ref: '#/components/responses/DefaultError'
+  /admin/tags/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Admin
+      summary: Sửa tag (slug/tên)
+      operationId: updateTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                slug:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '409':
+          $ref: '#/components/responses/DefaultError'
+    delete:
+      tags:
+      - Admin
+      summary: Xoá tag (409 nếu đang gắn tài liệu)
+      operationId: deleteTag
+      responses:
+        '204':
+          description: Đã xoá
+        '409':
+          $ref: '#/components/responses/DefaultError'
+  /doc-types:
+    get:
+      tags:
+      - Admin
+      summary: Loại tài liệu đang dùng (active) cho form tạo/lọc (ADM-F-02)
+      operationId: listActiveDocTypes
+      responses:
+        '200':
+          description: Trang loại tài liệu active
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/DefaultError'
+  /admin/doc-types:
+    get:
+      tags:
+      - Admin
+      summary: Quản trị loại tài liệu (kể cả ẩn)
+      operationId: listDocTypes
+      responses:
+        '200':
+          description: Trang loại tài liệu
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/DefaultError'
+    post:
+      tags:
+      - Admin
+      summary: Thêm loại tài liệu mới (code ổn định)
+      operationId: createDocType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - code
+              properties:
+                code:
+                  type: string
+                label:
+                  type: string
+                seq:
+                  type: integer
+      responses:
+        '201':
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '409':
+          $ref: '#/components/responses/DefaultError'
+  /admin/doc-types/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Admin
+      summary: Sửa loại tài liệu (label/seq/active — code bất biến)
+      operationId: updateDocType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                seq:
+                  type: integer
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/DefaultError'
+    delete:
+      tags:
+      - Admin
+      summary: Xoá loại tài liệu (409 nếu đang dùng)
+      operationId: deleteDocType
+      responses:
+        '204':
+          description: Đã xoá
+        '409':
+          $ref: '#/components/responses/DefaultError'
+  /documents/{docId}/audience:
+    parameters:
+    - name: docId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Admin
+      summary: Audience roles của tài liệu (ADM-F-02)
+      operationId: getDocAudience
+      responses:
+        '200':
+          description: Danh sách audience role + lý do
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/DefaultError'
+    put:
+      tags:
+      - Admin
+      summary: Đặt lại toàn bộ audience roles của tài liệu
+      operationId: setDocAudience
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - audience
+              properties:
+                audience:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - role
+                    properties:
+                      role:
+                        type: string
+                      reason:
+                        type: string
+      responses:
+        '200':
+          description: Audience sau cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '422':
+          $ref: '#/components/responses/DefaultError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OIDC access token từ SSO nội bộ (ADM-F-05, NFR-04)
+  parameters:
+    DocId:
+      name: doc_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: vd QA-PROC-005
+    VersionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Bắt buộc cho verb unsafe (§3.4). Same key+body → cache; khác body → 409.
+    Query:
+      name: q
+      in: query
+      schema:
+        type: string
+      description: từ khoá tìm kiếm
+    FilterType:
+      name: type
+      in: query
+      schema:
+        $ref: '#/components/schemas/DocumentType'
+    FilterTag:
+      name: tag
+      in: query
+      schema:
+        type: string
+    FilterStatus:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/VersionStatus'
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: opaque cursor (§3.5)
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+        maximum: 200
+  responses:
+    Unauthorized:
+      description: Thiếu/không hợp lệ token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Sai role (RBAC §10.1)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Không tìm thấy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Lỗi validate (BR-01/04/07...)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    StateConflict:
+      description: Chuyển trạng thái không hợp lệ (state machine §4.3)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    VersionOk:
+      description: OK
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DocumentVersion'
+    DefaultError:
+      description: Lỗi (client/nghiệp vụ) — xem code trong Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    DocumentType:
+      type: string
+      enum:
+      - Policy
+      - Process
+      - Procedure
+      - Work Instruction
+      - Template
+      - Checklist
+      - Standard
+    VersionStatus:
+      type: string
+      enum:
+      - Draft
+      - InReview
+      - Approved
+      - Published
+      - Effective
+      - Superseded
+      - Retired
+    FeedbackCategory:
+      type: string
+      enum:
+      - content_error
+      - unclear
+      - improvement
+      - question
+    FeedbackStatus:
+      type: string
+      enum:
+      - New
+      - Triaged
+      - InProgress
+      - Resolved
+      - Rejected
+    DocumentSummary:
+      type: object
+      required:
+      - doc_id
+      - title
+      - type
+      - effective_version
+      - status
+      properties:
+        doc_id:
+          type: string
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/DocumentType'
+        classification:
+          type: string
+        effective_version:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/VersionStatus'
+        tags:
+          type: array
+          items:
+            type: string
+    Document:
+      allOf:
+      - $ref: '#/components/schemas/DocumentSummary'
+      - type: object
+        properties:
+          mandatory_ack:
+            type: boolean
+          next_review_date:
+            type:
+            - string
+            - 'null'
+            format: date
+          audience_roles:
+            type: array
+            items:
+              type: string
+            description: REC-F-01
+    DocumentDetail:
+      allOf:
+      - $ref: '#/components/schemas/Document'
+      - type: object
+        properties:
+          is_effective:
+            type: boolean
+            description: false → cảnh báo non-Effective (DOC-F-12)
+          badge:
+            type:
+            - string
+            - 'null'
+            description: vd Sap ap dung tu 15/07/2026
+          effective_link:
+            type:
+            - string
+            - 'null'
+            description: link tới bản Effective nếu đang xem bản khác
+          content_html:
+            type: string
+            description: Markdown render (Markdig)
+    DocumentVersion:
+      type: object
+      required:
+      - id
+      - doc_id
+      - version
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        doc_id:
+          type: string
+        version:
+          type: string
+          pattern: ^\d+\.\d+$
+        status:
+          $ref: '#/components/schemas/VersionStatus'
+        issue_date:
+          type:
+          - string
+          - 'null'
+          format: date
+        effective_date:
+          type:
+          - string
+          - 'null'
+          format: date
+        change_summary:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    ReviewQueueItem:
+      type: object
+      description: Một version đang chờ duyệt (S9 review queue).
+      required:
+      - version_id
+      - doc_id
+      - title
+      - version
+      - submitted_at
+      properties:
+        version_id:
+          type: string
+          format: uuid
+        doc_id:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+          pattern: ^\d+\.\d+$
+        submitted_at:
+          type: string
+          format: date-time
+          description: Thời điểm chuyển sang InReview (version.updated_at).
+    VersionContent:
+      type: object
+      description: Nội dung markdown của một version (dùng cho editor S7).
+      required:
+      - version_id
+      - doc_id
+      - version
+      - status
+      - content_markdown
+      properties:
+        version_id:
+          type: string
+          format: uuid
+        doc_id:
+          type: string
+        version:
+          type: string
+        status:
+          $ref: '#/components/schemas/VersionStatus'
+        content_markdown:
+          type: string
+    UpdateContentRequest:
+      type: object
+      required:
+      - content_markdown
+      properties:
+        content_markdown:
+          type: string
+          description: Nội dung markdown mới của bản draft.
+    CreateDocumentRequest:
+      type: object
+      required:
+      - doc_id
+      - title
+      - type
+      properties:
+        doc_id:
+          type: string
+          pattern: ^[A-Z]{2,}-[A-Z]{2,}-\d{3,}$
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        type:
+          $ref: '#/components/schemas/DocumentType'
+        classification:
+          type: string
+        mandatory_ack:
+          type: boolean
+          default: false
+        next_review_date:
+          type: string
+          format: date
+        audience_roles:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        content_markdown:
+          type: string
+    CreateVersionRequest:
+      type: object
+      required:
+      - change_type
+      properties:
+        change_type:
+          type: string
+          enum:
+          - minor
+          - major
+          description: BR-05
+        content_markdown:
+          type: string
+    PublishRequest:
+      type: object
+      required:
+      - issue_date
+      - effective_date
+      - change_summary
+      properties:
+        issue_date:
+          type: string
+          format: date
+        effective_date:
+          type: string
+          format: date
+          description: có thể tương lai; >= issue_date (BR-07)
+        change_summary:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: bắt buộc (BR-04)
+    PublishResult:
+      type: object
+      properties:
+        version_id:
+          type: string
+          format: uuid
+        doc_id:
+          type: string
+        version:
+          type: string
+        status:
+          $ref: '#/components/schemas/VersionStatus'
+        effective_date:
+          type: string
+          format: date
+        badge:
+          type:
+          - string
+          - 'null'
+    Acknowledgement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_id:
+          type: string
+          format: uuid
+        acked_at:
+          type: string
+          format: date-time
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_id:
+          type: string
+          format: uuid
+        doc_id:
+          type: string
+          description: Mã tài liệu (server gắn — tiện cho triage S14).
+        version:
+          type: string
+        category:
+          $ref: '#/components/schemas/FeedbackCategory'
+        status:
+          $ref: '#/components/schemas/FeedbackStatus'
+        body:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+    CreateFeedbackRequest:
+      type: object
+      required:
+      - doc_id
+      - version
+      - category
+      description: Ngữ cảnh (doc_id/version/url) đính kèm; server tự gắn, không tin client cho định danh (FBK-F-04).
+      properties:
+        doc_id:
+          type: string
+        version:
+          type: string
+        url:
+          type: string
+        category:
+          $ref: '#/components/schemas/FeedbackCategory'
+        body:
+          type: string
+          maxLength: 2000
+    RecommendationItem:
+      type: object
+      required:
+      - doc_id
+      - version
+      - reason
+      properties:
+        doc_id:
+          type: string
+        version:
+          type: string
+        title:
+          type: string
+        effective_date:
+          type:
+          - string
+          - 'null'
+          format: date
+        reason:
+          type: string
+          description: 'explainable: bat buoc / can doc lai / khop role / vua cap nhat (BR-11)'
+    Recommendations:
+      type: object
+      properties:
+        must_read:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendationItem'
+        suggested:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendationItem'
+    OnboardingItem:
+      type: object
+      required:
+      - doc_id
+      - title
+      - seq
+      - mandatory
+      - acked
+      properties:
+        doc_id:
+          type: string
+        title:
+          type: string
+        seq:
+          type: integer
+        mandatory:
+          type: boolean
+        effective_version:
+          type:
+          - string
+          - 'null'
+        acked:
+          type: boolean
+          description: user đã xác nhận đọc bản Effective (DOC-F-09)
+    OnboardingProgress:
+      type: object
+      required:
+      - total
+      - read
+      - percent
+      properties:
+        total:
+          type: integer
+        read:
+          type: integer
+        percent:
+          type: integer
+          description: '0..100 (read/total)'
+    Onboarding:
+      type: object
+      required:
+      - progress
+      - items
+      properties:
+        title:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        progress:
+          $ref: '#/components/schemas/OnboardingProgress'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingItem'
+    Notification:
+      type: object
+      required:
+      - id
+      - type
+      - title
+      - read
+      - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: 'doc_effective (mở rộng: review_due…)'
+        doc_id:
+          type:
+          - string
+          - 'null'
+        title:
+          type: string
+        read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    NotificationList:
+      type: object
+      required:
+      - data
+      - unread_count
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        unread_count:
+          type: integer
+    Subscription:
+      type: object
+      required:
+      - doc_id
+      - title
+      - subscribed_at
+      properties:
+        doc_id:
+          type: string
+        title:
+          type: string
+        subscribed_at:
+          type: string
+          format: date-time
+    SubscriptionStatus:
+      type: object
+      required:
+      - doc_id
+      - subscribed
+      properties:
+        doc_id:
+          type: string
+        subscribed:
+          type: boolean
+    SearchHit:
+      type: object
+      properties:
+        doc_id:
+          type: string
+        version:
+          type: string
+        title:
+          type: string
+        snippet:
+          type: string
+        score:
+          type: number
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor:
+          type: string
+        action:
+          type: string
+        document_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        at:
+          type: string
+          format: date-time
+    AssistantAnswer:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - answered
+          - insufficient
+          description: insufficient = "không chắc" (BOT-F-04)
+        answer:
+          type:
+          - string
+          - 'null'
+        citations:
+          type: array
+          description: bắt buộc khi answered (BOT-F-03)
+          items:
+            type: object
+            properties:
+              doc_id:
+                type: string
+              version:
+                type: string
+              effective_date:
+                type: string
+                format: date
+              url:
+                type: string
+              snippet:
+                type: string
+    Page:
+      type: object
+      properties:
+        next_cursor:
+          type:
+          - string
+          - 'null'
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              description: mã lỗi theo ISC Error Code catalog
+            message:
+              type: string
+            details:
+              type:
+              - object
+              - 'null'
+              additionalProperties: true

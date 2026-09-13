@@ -1,0 +1,207 @@
+# Schema Snapshot — Single Source of Truth cho external API + DB
+# Load khi Phase 0 phát hiện task đụng external API hoặc DB
+# Tham khảo: docs/ai/HALLUCINATION_RULES.md, guides/hallucination-guide.md
+#
+# ⚠️  File này là FILE QUAN TRỌNG NHẤT để prevent hallucination.
+# ⚠️  Cập nhật ngay khi phát hiện schema mới hoặc gotcha.
+
+# ── External APIs ──────────────────────────────────────────────────
+external_apis:
+  keycloak_token:
+    purpose: "OIDC IdP (A1a). Access token JWT dùng cho Auth:Mode=Oidc. Đã VERIFY bằng token thật (author1, 2026-07-26)."
+    authority_dev: "http://localhost:8081/realms/qgp"
+    discovery: "GET {authority}/.well-known/openid-configuration"
+    token_endpoint: "POST {authority}/protocol/openid-connect/token"
+    claims_present: [iss, aud, sub, preferred_username, email, name, realm_access, resource_access, exp, iat]
+    gotcha: "Realm role Ở TRONG realm_access.roles (JSON array), KHÔNG phải claim 'role' phẳng → cần KeycloakClaimsTransformation flatten qua Auth:RoleMap. iss = URL realm (== authority) → ValidIssuer phải = authority (KHÔNG 'qgp-dev'). aud CHỈ có 'qgp-api' nhờ audience mapper trên client qgp-web (nếu thiếu mapper → aud=['account'] → API 401). sub = UUID user (KHÔNG phải username; username ở preferred_username). Local http → JwtBearer cần RequireHttpsMetadata=false."
+    not_in_token:            # đừng giả định có
+      - "claim 'role' phẳng (roles nằm trong realm_access/resource_access)"
+      - "username ở 'sub' (sub là UUID)"
+    role_map:                # keycloak realm role (lowercase) → app role (Auth:RoleMap, appsettings.json)
+      reader: READER
+      contributor: CONTRIBUTOR
+      author: AUTHOR
+      approver: APPROVER
+      qa_lead: QA_LEAD
+      admin: ADMIN
+# stripe_payment_intent:
+#   endpoint: "POST https://api.stripe.com/v1/payment_intents"
+#   auth: "Bearer {STRIPE_SECRET_KEY}"
+#   required: [amount, currency]
+#   optional: [description, metadata, idempotency_key]
+#   returns: {id: str, status: str, client_secret: str}
+#   nullable: [description, metadata]
+#   gotcha: "amount là integer cents, KHÔNG phải float dollars"
+#   not_in_response:        # field Claude hay hallucinate có ở đây
+#     - raw_card_data
+#     - cvv
+#
+# gitlab_mr_list:
+#   endpoint: "GET /projects/:id/merge_requests"
+#   NOT_available:           # Claude hay assume có ở đây nhưng KHÔNG có
+#     - additions
+#     - deletions
+#   gotcha: "List endpoint KHÔNG có additions/deletions. Phải gọi single endpoint."
+#   workaround_for_additions: "GET /projects/:id/merge_requests/:iid"
+
+# ── Internal APIs ──────────────────────────────────────────────────
+internal_apis:
+  getRecommendations:
+    endpoint: "GET /v1/recommendations"
+    rbac: "doc.read (mọi role; 0 role → 403)"
+    returns: "{ must_read: RecommendationItem[], suggested: RecommendationItem[] }"
+    item_fields: [doc_id, version, title, effective_date, reason]
+    nullable: [title, effective_date]
+    gotcha: "REC-F-02/BR-11 (SDD §5.2). candidates = Effective ∩ audience_roles(user.roles). reason nguyên văn tiếng Việt: 'Bắt buộc'|'Cần đọc lại'|'Vừa cập nhật'|'Khớp vai trò'. Roles đọc từ claim 'role'. Read-only (KHÔNG upsert user như audit). Redis cache 5m (§5.2) CHƯA wire — hiện tính mỗi request. FE '/' = HomePage, '/start' = StartHerePage dùng chung endpoint này."
+  getOnboarding:
+    endpoint: "GET /v1/onboarding"
+    rbac: "doc.read (0 role → 403)"
+    returns: "{ title?, roles: string[], progress: {total,read,percent}, items: OnboardingItem[] }"
+    item_fields: [doc_id, title, seq, mandatory, effective_version, acked]
+    nullable: [title, effective_version]
+    gotcha: "ONB-F-01/02/04 (S12). Gộp learning_paths của mọi role user; item xếp theo seq; acked = ack bản Effective hiện hành. Read-only. FE route /onboarding = OnboardingPage."
+  reports:
+    endpoints: ["GET /v1/reports/issuance", "GET /v1/reports/compliance", "GET /v1/reports/feedback", "GET /v1/reports/access"]
+    rbac: "admin.config (QA_LEAD/ADMIN; READER → 403)"
+    issuance_returns: "{ total_documents, effective_count, by_type{}, by_version_status{}, issued_this_month, overdue_review, due_soon_review, with_change_summary_percent }"
+    compliance_returns: "{ mandatory_docs, fully_compliant_docs, items:[{doc_id,title,effective_version,audience_count,acked_count,percent,not_read[]}] }"
+    feedback_returns: "{ total, by_status{}, avg_resolution_hours, resolved_count } (RPT-F-05 — data thật từ feedback table)"
+    access_returns: "{ effective_with_zero_ack, zero_ack_docs[], top_engaged[], note } (RPT-F-03 — PROXY theo ack, CHƯA có event lượt xem; note nêu rõ)"
+    gotcha: "RPT-F-01/02/03/04/05 (S15). openapi loose (additionalProperties) → FE local interface (types.ts, tiền lệ DiffResult). Compliance audience = user_roles ∩ doc_audience_roles (dev thường 0). Access là PROXY (event tracking doc_viewed/search_performed để P3). Aggregate — privacy §6."
+  admin_s17:
+    endpoints:
+      - "GET /v1/admin/rbac"                       # ma trận §10.1 (read-only)
+      - "GET /v1/admin/users?limit"                # user (lớp chiếu B0) + role
+      - "GET|POST /v1/admin/tags · PATCH|DELETE /v1/admin/tags/{id}"
+      - "GET /v1/doc-types (active, doc.read) · GET|POST /v1/admin/doc-types · PATCH|DELETE /v1/admin/doc-types/{id}"
+      - "GET|PUT /v1/documents/{docId}/audience"
+    rbac: "admin.config (QA_LEAD/ADMIN) cho mọi /admin/* + audience; /v1/doc-types (active) = doc.read (form/filter)"
+    gotcha: "B1/S17 (ADM-F-01/02). RBAC read-only (không sửa role trong app — Keycloak là nguồn authz; users list từ lớp chiếu B0). Tag CRUD: xoá chặn nếu đang gắn (TAG_IN_USE); slug unique (TAG_SLUG_CONFLICT). Doc-type: code bất biến (PATCH chỉ label/seq/active), xoá chặn nếu dùng (DOC_TYPE_IN_USE), tạo doc validate type theo doc_types active. Audience PUT thay thế toàn bộ tập (reconcile), validate role code. FE dùng local interface (openapi loose, tiền lệ DiffResult): RbacMatrix/AdminUser/AdminTag/AdminDocType/DocAudienceItem trong types.ts; AdminPage /admin 4 tab (RBAC/Users/Tags/DocTypes). Audience UI để DocumentPage (BE + test xong, UI sau)."
+  notifications:
+    endpoints: ["GET /v1/notifications?unread_only", "POST /v1/notifications/{id}/read", "POST /v1/notifications/read-all"]
+    rbac: "doc.read"
+    list_returns: "{ data: Notification[], unread_count }"
+    item_fields: [id, type, doc_id, title, read, created_at]
+    nullable: [doc_id]
+    gotcha: "ADM-F-04/S19. Sinh khi doc thành Effective cho audience (xem bảng notifications). mark-read chỉ chủ sở hữu (else NOTIFICATION_NOT_FOUND). FE = NotificationBell dropdown trong AppShell (không route riêng). type values: 'doc_effective' (S19) · 'doc_review_due'/'doc_review_overdue' (B2/DOC-F-08 — ReviewReminderService, người nhận QA_LEAD/ADMIN, dedupe theo (doc,type) trong LeadDaysWarn=30 ngày)."
+# auth_service_login:
+#   endpoint: "POST /api/v1/auth/login"
+#   required: [email, password]
+#   returns: {token: str, user: object, expires_at: datetime}
+#   nullable: []
+
+# ── Database schema ────────────────────────────────────────────────
+# QGP Postgres 16 · schema "qgp" (KHÔNG dùng public) · EF Core migration InitialCreate
+# (apps/api/src/Qgp.Api/Infrastructure/Persistence/Migrations/*_InitialCreate.cs).
+# Mọi bảng: id UUID DEFAULT gen_random_uuid(); business table có created_at+updated_at (now()).
+# Enum lưu dạng text (Status/Type/Category/RelationType). 12 bảng core.
+database:
+  documents:
+    columns: [id, doc_id, title, type, classification, current_effective_version_id, mandatory_ack, next_review_date, created_at, updated_at]
+    nullable: [classification, current_effective_version_id, next_review_date]
+    unique: [doc_id]                 # uq_doc_id (BR-01)
+    gotcha: "doc_id là business key immutable (BR-01); current_effective_version_id trỏ bản Effective (BR-02, nullable). B1 chiều sâu (2026-07-26): type GIỜ là string tự do (bỏ enum DocumentType) = doc_types.code, maxlen 50, validate lúc tạo doc theo doc_types active. Giá trị wire GIỮ NGUYÊN (kể cả 'Work Instruction' có dấu cách); migration AddDocTypes fix dữ liệu cũ 'WorkInstruction'→'Work Instruction'."
+  document_versions:
+    columns: [id, document_id, version, status, issue_date, effective_date, change_summary, content_git_ref, content_markdown, created_at, updated_at]
+    nullable: [issue_date, effective_date, change_summary, content_git_ref, content_markdown]
+    note: "content_markdown = nội dung tạm ở DB (migration AddVersionContent) TRƯỚC khi có Git store (E1.6); content_html render bằng Markdig từ content_markdown"
+    indexes: [uq_one_effective_per_doc, document_versions_status_effective_date_idx]
+    gotcha: "uq_one_effective_per_doc = PARTIAL UNIQUE (document_id) WHERE status='Effective' (BR-02); CHECK ck_effective_ge_issue: effective_date>=issue_date (BR-07). status text 8 giá trị (7 openapi + UnderRevision nội bộ). content: draft ở content_markdown (DB, mutable qua PATCH /versions/{id}/content); khi PUBLISH → commit vào Git → content_git_ref = SHA (LibGit2Sharp, ADR-0015, immutable BR-03)."
+  roles:
+    columns: [id, code, name, created_at, updated_at]
+    unique: [code]
+    seeded: [READER, CONTRIBUTOR, AUTHOR, APPROVER, QA_LEAD, ADMIN]   # SDD §6.2, HasData Guid cố định 1111..1101-1106
+  users:
+    columns: [id, sso_subject, display_name, email, created_at, updated_at]
+    nullable: [display_name, email]
+    unique: [sso_subject]
+    gotcha: "PII tối thiểu (OD-3); định danh qua OIDC sso_subject. B0 (2026-07-26): GET /me gọi UserProvisioningService.SyncAsync → upsert user (ON CONFLICT + COALESCE profile) + RECONCILE user_roles theo claim 'role' (mirror). DB CHỈ CHIẾU role từ Keycloak (authz vẫn đọc token, KHÔNG đọc user_roles ở prod). Chỉ user đã login mới có trong DB → B1 users list + B2 recipients (QA_LEAD/ADMIN) chỉ thấy người đã đăng nhập."
+  user_roles: { columns: [user_id, role_id, created_at], pk: [user_id, role_id] }
+  tags: { columns: [id, slug, name, created_at, updated_at], unique: [slug] }
+  doc_types:
+    columns: [id, code, label, seq, active, created_at, updated_at]
+    unique: [code]                   # uq_doc_types_code
+    seeded: ["Policy", "Process", "Procedure", "Work Instruction", "Template", "Checklist", "Standard"]   # Guid 2222..2201-2207
+    gotcha: "B1 chiều sâu (migration AddDocTypes 2026-07-26). NGUỒN SỰ THẬT cho loại tài liệu thay enum DocumentType. code = giá trị dùng ở documents.type + Meili filter (ổn định, KHÔNG sửa qua PATCH); label để hiển thị; seq thứ tự; active bật/tắt. Seed code==label==giá trị wire cũ. CRUD /v1/admin/doc-types; xoá chặn nếu documents còn dùng (DOC_TYPE_IN_USE). Thêm loại mới runtime → không cần đổi code/enum."
+  doc_tags: { columns: [document_id, tag_id, created_at], pk: [document_id, tag_id] }
+  doc_audience_roles:
+    columns: [document_id, role_id, reason, created_at]
+    pk: [document_id, role_id]
+    indexes: [doc_audience_roles_role_id_idx]
+    gotcha: "reason = nguồn explainable cho REC (BR-11)"
+  doc_relations:
+    columns: [id, source_document_id, target_document_id, relation_type, created_at, updated_at]
+    unique: [uq_doc_relation (source,target,relation_type)]
+    gotcha: "relation_type text: Supersedes/DependsOn/Impacts (DOC-F-07)"
+  acknowledgements:
+    columns: [id, user_id, version_id, acked_at, created_at, updated_at]
+    unique: [uq_ack_user_version (user_id,version_id)]
+    gotcha: "reset khi major version (BR-05/08); per-user (nghĩa vụ compliance, OD-3)"
+  feedback:
+    columns: [id, version_id, user_id, category, status, body, created_at, updated_at]
+    nullable: [body]
+    indexes: [feedback_status_created_at_idx]
+    gotcha: "category/status text; context server-attached (FBK-F-04)"
+  audit_logs:
+    columns: [id, actor_id, action, document_id, at, created_at]
+    nullable: [actor_id, document_id]
+    indexes: [audit_log_at_idx, audit_log_document_id_idx]
+    pk: "(id, at) — composite (partition key phải nằm trong PK)"
+    partitions: [audit_logs_2026_07, audit_logs_2026_08, audit_logs_default, "+ Quartz tự tạo tháng kế"]
+    gotcha: "PARTITIONED theo tháng RANGE(at) từ 2026-07-25 (migration PartitionAuditLogs, ADR SDD §2.4) + DEFAULT partition + AuditPartitionMaintenanceJob (monthsAhead=2). actor_id GIỜ map từ sso_subject (upsert ON CONFLICT); action string sạch (bỏ 'by <sub>'); scheduler→actor_id NULL. Tạo partition cho tháng đã có rows trong DEFAULT sẽ FAIL (tạo trước). append-only (không updated_at). Giữ >=2 năm (NFR-03)."
+  learning_paths:
+    columns: [id, role_id, title, description, created_at, updated_at]
+    nullable: [description]
+    unique: [uq_learning_path_role (role_id)]   # 1 lộ trình / role (ONB-F-01)
+    gotcha: "migration AddOnboarding (2026-07-25/26). role_id FK cascade. Seed dev: READER → 'Nhập môn Chất lượng' (DevDataSeeder.SeedOnboardingPathAsync, độc lập với seed doc)."
+  path_items:
+    columns: [id, learning_path_id, document_id, seq, mandatory, created_at]
+    pk: [id]
+    unique: [uq_path_item_doc (learning_path_id, document_id)]
+    indexes: [path_items_path_seq_idx]
+    gotcha: "seq int (thứ tự), mandatory bool. FK learning_path + document đều cascade. KHÔNG có updated_at (append-style). OnboardingService gộp item theo doc nếu user nhiều role."
+  notifications:
+    columns: [id, user_id, type, document_id, title, read_at, created_at, updated_at]
+    nullable: [document_id, read_at]
+    indexes: [notifications_user_read_created_idx]
+    gotcha: "ADM-F-04/S19 (migration AddNotifications + AddNotificationDocFk). type text (doc_effective…). read_at null = chưa đọc. FK user cascade + FK document CASCADE (xoá doc → dọn notification, tránh doc_id treo → doc_id null bị serializer bỏ). Sinh ở EffectiveTransition.Apply path (VersionService.PublishAsync publish-tới-hạn + EffectiveTransitionService scheduler) cho AUDIENCE (role∈doc_audience_roles) ∪ SUBSCRIBERS (subscriptions), dedupe. NotificationService.CreateForAudienceAsync KHÔNG SaveChanges (commit chung như audit)."
+  subscriptions:
+    columns: [id, user_id, document_id, created_at]
+    unique: [uq_subscription_user_doc (user_id, document_id)]
+    gotcha: "ADM-F-04/S19 theo dõi tài liệu (migration AddSubscriptions). FK user + document đều CASCADE. SubscriptionService.ResolveAsync upsert user ON CONFLICT (theo dõi có thể là first-action). Người theo dõi được thêm vào tập nhận notification khi doc→Effective (union với audience). KHÔNG updated_at."
+# payments:
+#   columns: [id, amount, currency, status, stripe_payment_id, created_at, updated_at]
+#   nullable: [stripe_payment_id]   # null cho payments chưa submit
+#   unique: [stripe_payment_id]
+#   indexes: [created_at, status]
+#   auto_generated: [id, created_at, updated_at]
+#   gotcha: "amount stored in cents (integer)"
+#
+# users:
+#   columns: [id, email, password_hash, created_at]
+#   nullable: []
+#   unique: [email]
+#   gotcha: "password_hash là bcrypt, không phải plaintext"
+
+# ── Message queue / events ────────────────────────────────────────
+events: {}
+# webhook.payment.succeeded:
+#   payload: {payment_id: str, amount: int, currency: str, customer_id: str}
+#   nullable: [customer_id]
+#   gotcha: "Có thể bị duplicate. Dedup bằng idempotency_key."
+
+# ── External services config ──────────────────────────────────────
+services:
+  meilisearch:
+    purpose: "Full-text search VN (E1.4). Index CHỈ tài liệu Effective (BR-06)."
+    url_dev: "http://localhost:7700"
+    auth: "Bearer {QGP_MEILI_KEY} (dev: qgp_dev_master_key, khớp docker-compose MEILI_MASTER_KEY)"
+    index: "documents (primaryKey=id=doc_id); searchable [title,content,tags]; filterable [type,tags]"
+    gotcha: "Meili .NET SDK 0.15 KHÔNG auth GET /tasks → dùng HttpClient thô (apps/api/.../MeiliSearchIndex.cs). Reindex: POST /admin/reindex [AdminConfig]. Hook index sau publish-effective + scheduler WF-03."
+  redis:
+    purpose: "Cache render Effective + idempotency key (chưa wire code, có container)"
+    url_dev: "localhost:6379"
+# redis:
+#   purpose: "Session cache + rate limiting"
+#   key_prefixes: ["session:", "ratelimit:", "lock:"]
+#   ttl_default: 3600

@@ -1,0 +1,89 @@
+erDiagram
+  USERS ||--o{ USER_ROLES : has
+  ROLES ||--o{ USER_ROLES : grants
+  DOCUMENTS ||--o{ DOCUMENT_VERSIONS : has
+  DOCUMENTS ||--o{ DOC_AUDIENCE_ROLES : targets
+  ROLES ||--o{ DOC_AUDIENCE_ROLES : audience
+  DOCUMENTS ||--o{ DOC_TAGS : tagged
+  TAGS ||--o{ DOC_TAGS : labels
+  DOCUMENTS ||--o{ DOC_RELATIONS : source
+  DOCUMENT_VERSIONS ||--o{ ACKNOWLEDGEMENTS : acknowledged
+  USERS ||--o{ ACKNOWLEDGEMENTS : signs
+  DOCUMENT_VERSIONS ||--o{ FEEDBACK : about
+  USERS ||--o{ FEEDBACK : submits
+  DOCUMENTS ||--o{ AUDIT_LOG : concerns
+  ROLES ||--o{ LEARNING_PATHS : for_role
+  LEARNING_PATHS ||--o{ PATH_ITEMS : contains
+  DOCUMENTS ||--o{ PATH_ITEMS : includes
+
+  DOCUMENTS {
+    uuid id PK
+    string doc_id UK "BR-01 immutable"
+    string title
+    string type
+    string classification
+    uuid current_effective_version_id FK "BR-02"
+    bool mandatory_ack
+    date next_review_date
+  }
+  DOCUMENT_VERSIONS {
+    uuid id PK
+    uuid document_id FK
+    string version
+    string status
+    date issue_date
+    date effective_date "BR-07"
+    text change_summary "BR-04"
+    string content_git_ref "BR-03"
+  }
+  ACKNOWLEDGEMENTS {
+    uuid id PK
+    uuid user_id FK
+    uuid version_id FK
+    timestamp acked_at "BR-05/08"
+  }
+  FEEDBACK {
+    uuid id PK
+    uuid version_id FK
+    uuid user_id FK
+    string category
+    string status
+  }
+  DOC_AUDIENCE_ROLES {
+    uuid document_id FK
+    uuid role_id FK
+    string reason "REC explainable"
+  }
+  DOC_RELATIONS {
+    uuid source_document_id FK
+    uuid target_document_id FK
+    string relation_type "supersedes/depends_on/impacts"
+  }
+  AUDIT_LOG {
+    uuid id PK
+    uuid actor_id FK
+    string action
+    timestamp at "NFR-03 >= 2y"
+  }
+  LEARNING_PATHS {
+    uuid id PK
+    uuid role_id FK
+    string title
+  }
+  PATH_ITEMS {
+    uuid id PK
+    uuid learning_path_id FK
+    uuid document_id FK
+    int seq
+    bool mandatory
+  }
+  USERS { uuid id PK
+    string sso_subject UK }
+  ROLES { uuid id PK
+    string code UK }
+  TAGS { uuid id PK
+    string slug UK }
+  USER_ROLES { uuid user_id FK
+    uuid role_id FK }
+  DOC_TAGS { uuid document_id FK
+    uuid tag_id FK }

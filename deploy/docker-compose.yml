@@ -1,0 +1,70 @@
+# QGP local dev stack (E0.1/T1) — Postgres 16 (+pgvector) · Meilisearch · Redis.
+# Q2 đã chốt: docker-compose local trước; nối GitLab CI + Ubuntu sau.
+# Chạy: docker compose -f deploy/docker-compose.yml up -d
+name: qgp
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16   # Postgres 16 kèm extension pgvector (SDD stack, RAG P3)
+    container_name: qgp-postgres
+    environment:
+      POSTGRES_USER: qgp
+      POSTGRES_PASSWORD: qgp
+      POSTGRES_DB: qgp_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - qgp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qgp -d qgp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: qgp-meili
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: qgp_dev_master_key
+    ports:
+      - "7700:7700"
+    volumes:
+      - qgp_meilidata:/meili_data
+    # Không set healthcheck: image meili không có curl/wget. Kiểm tra thủ công GET :7700/health.
+
+  redis:
+    image: redis:7-alpine
+    container_name: qgp-redis
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - qgp_redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # OIDC IdP (A1a). Import realm 'qgp' (client qgp-web PKCE + qgp-api audience, 6 roles, users mẫu).
+  # start-dev = H2 in-memory (ephemeral, đủ cho dev). Port 8081 (tránh :8080 đã bị chiếm — known gotcha).
+  # BE nối qua Auth:Mode=Oidc + Auth:OidcAuthority=http://localhost:8081/realms/qgp + Auth:RequireHttpsMetadata=false.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: qgp-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin        # admin console: http://localhost:8081 (chỉ dev)
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak/realm-qgp.json:/opt/keycloak/data/import/realm-qgp.json:ro
+
+volumes:
+  qgp_pgdata:
+  qgp_meilidata:
+  qgp_redisdata:
