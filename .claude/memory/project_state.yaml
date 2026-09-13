@@ -3,10 +3,10 @@
 # Tham khảo: guides/memory-system.md
 
 # ── Pattern (set bởi /classify, đừng sửa tay) ──────────────────────
-pattern: A                          # A | B | C
-classified_at: "YYYY-MM-DD"
-loc_at_classification: 0
-next_review_threshold: 12000        # /classify lại khi LOC vượt số này
+pattern: B                          # A | B | C — re-classify 2026-09-14 (LOC 57314 > 12000)
+classified_at: "2026-09-14"
+loc_at_classification: 57314        # git ls-files (cs/tsx/ts/css/json/yaml/yml/md/sh/sql/Dockerfile/conf), 436 files
+next_review_threshold: 100000       # Pattern B: 10-100k LOC, re-classify khi vượt 100k
 team_size: 1
 
 # ── Identity ────────────────────────────────────────────────────────
