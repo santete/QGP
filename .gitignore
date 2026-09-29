@@ -1,4 +1,60 @@
+# ============================================================
+# QGP — root .gitignore
+# Lưu ý: build artifact của từng app do .gitignore con xử lý:
+#   apps/web/.gitignore  → node_modules, dist, coverage, .vite
+#   apps/api/.gitignore  → bin/, obj/, *.user, .vs/
+#   .claude/.gitignore   → cache/, metrics/, memory/session_*.md
+# File này chỉ chứa rule phạm vi toàn repo.
+# ============================================================
 
-# QGP Git content store (nội dung tài liệu — dùng volume ở prod, KHÔNG commit vào repo project)
+# --- QGP Git content store (nội dung tài liệu — dùng volume ở prod, KHÔNG commit vào repo project) ---
 content-repo/
 **/content-repo/
+
+# --- Secret: chỉ .env.prod.example được commit, giá trị thật thì KHÔNG (xem deploy/SECRETS.md, ADR-0012) ---
+.env.prod
+**/.env.prod
+.env.production
+**/.env.production
+*.local
+.env.*.local
+# Khóa / chứng chỉ
+*.pem
+*.key
+*.pfx
+*.p12
+!**/*.public.pem
+
+# --- Claude Code: code graph sinh tự động, không commit (per CLAUDE.md Reference Map) ---
+.claude/memory/code_graph.json
+
+# --- Build / package artifact phạm vi repo ---
+node_modules/
+dist/
+bin/
+obj/
+coverage/
+TestResults/
+*.tsbuildinfo
+
+# --- Log & temp ---
+*.log
+npm-debug.log*
+yarn-error.log*
+.tmp/
+tmp/
+
+# --- Office lock file (product-spec chứa .docx/.xlsx) ---
+~$*
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editor / IDE ---
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
