@@ -3,10 +3,12 @@
 # Tham khảo: guides/memory-system.md
 
 # ── Pattern (set bởi /classify, đừng sửa tay) ──────────────────────
-pattern: B                          # A | B | C — re-classify 2026-09-14 (LOC 57314 > 12000)
-classified_at: "2026-09-14"
-loc_at_classification: 57314        # git ls-files (cs/tsx/ts/css/json/yaml/yml/md/sh/sql/Dockerfile/conf), 436 files
-next_review_threshold: 100000       # Pattern B: 10-100k LOC, re-classify khi vượt 100k
+pattern: B                          # A | B | C — re-classify 2026-10-01: GIỮ B (user chốt), code LOC 38616 < 100k
+classified_at: "2026-10-01"
+loc_at_classification: 38616        # /classify Bước 1: chỉ file code (cs/ts/tsx/py/js…), bỏ .claude/ + docs/ai/ — 273 file
+# ⚠️ Phase 0 step 3 đo `git ls-files | xargs wc -l` (MỌI file: md/yaml/json/lock) = 100592 ở 2026-10-01 → so với
+#    threshold này sẽ báo sớm hơn thực tế. Khi trigger: đo lại bằng lệnh /classify Bước 1 trước khi đổi pattern.
+next_review_threshold: 120000       # Pattern B (skill /classify gợi ý 120000)
 team_size: 1
 
 # ── Identity ────────────────────────────────────────────────────────
@@ -179,6 +181,10 @@ completed_tasks:
 
 # ── Decisions (architectural, không hiển nhiên từ code) ────────────
 decisions:
+- date: "2026-10-01"
+  decision: "Re-classify khi Phase 0 báo LOC 100592 > 100000: GIỮ Pattern B, không lên C. team_size 1."
+  reason: "Số 100592 đếm mọi file tracked (docs/spec/yaml/lock/.claude). /classify Bước 1 (chỉ code) = 38616 (cs 29850, tsx 4680, ts 4033); code viết tay ~13.8k (bỏ Migrations/generated/schema.d.ts). Matrix 10-100k → B. Pattern C (Council of 6) quá nặng cho dự án 1 người. User chốt."
+  impact: "next_review_threshold 120000. Phase 0 vẫn đo all-files → khi trigger lại, đo bằng lệnh /classify Bước 1 trước khi đổi pattern."
 - date: "2026-10-01"
   decision: "Ops go-live: Keycloak self-host trong compose prod (start + DB Postgres riêng 'keycloak'); secrets prod = Docker secrets file (chưa Vault); observability = compose riêng deploy/observability (project qgp-obs); CSP = template env lúc start, mặc định Report-Only."
   reason: "User chốt 4 lựa chọn (AskUserQuestion 2026-10-01). Docker secrets dùng cùng cơ chế /run/secrets như Vault Agent → lên Vault sau không sửa code. CSP Report-Only tránh chặn login OIDC khi origin sai."
