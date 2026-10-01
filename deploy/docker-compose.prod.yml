@@ -8,10 +8,18 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-qgp}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD
       POSTGRES_DB: ${POSTGRES_DB:-qgp_db}
+      # Init script (chỉ chạy khi volume trống) tạo role + DB riêng cho Keycloak.
+      KC_DB_NAME: ${KC_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?set KC_DB_PASSWORD}
+    secrets:
+      - source: postgres_password
+        target: POSTGRES_PASSWORD
     volumes:
       - qgp_pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qgp} -d ${POSTGRES_DB:-qgp_db}"]
       interval: 5s
@@ -37,32 +45,57 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    # Prod thật nên dùng DB ngoài (KC_DB) + hostname cố định; đây là bản gọn cho staging.
-    command: ["start-dev", "--import-realm"]
+    # Prod (DEPLOY.md §5): 'start' + DB Postgres riêng. TLS terminate ở reverse proxy/LB trước Keycloak
+    # (KC_PROXY_HEADERS). Realm prod KHÔNG có user mẫu; import bỏ qua nếu realm 'qgp' đã tồn tại.
+    command: ["start", "--import-realm"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KC_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?set KC_DB_PASSWORD}
+      KC_HOSTNAME: ${KC_HOSTNAME:?set KC_HOSTNAME}   # URL công khai, vd https://sso.example.com
+      KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      QGP_WEB_ORIGIN: ${QGP_WEB_ORIGIN:?set QGP_WEB_ORIGIN}   # thay ${QGP_WEB_ORIGIN} trong realm prod
     volumes:
-      - ./keycloak/realm-qgp.json:/opt/keycloak/data/import/realm-qgp.json:ro
+      - ./keycloak/realm-qgp.prod.json:/opt/keycloak/data/import/realm-qgp.json:ro
     ports:
       - "${KEYCLOAK_PORT:-8081}:8080"
     restart: unless-stopped
+
+  # Áp EF migration một lần rồi thoát (Production image không auto-migrate). api chỉ start khi exit 0.
+  migrate:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    secrets:
+      - source: qgp_db_connection
+        target: QGP_DB_CONNECTION
+    restart: "no"
 
   api:
     build:
       context: ../apps/api
       dockerfile: Dockerfile
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       meilisearch:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      QGP_DB_CONNECTION: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-qgp_db};Username=${POSTGRES_USER:-qgp};Password=${POSTGRES_PASSWORD}"
-      QGP_MEILI_KEY: ${MEILI_MASTER_KEY}
       Meili__Url: "http://meilisearch:7700"
       Auth__Mode: Oidc
       Auth__OidcAuthority: ${OIDC_AUTHORITY:?set OIDC_AUTHORITY}
@@ -70,6 +103,12 @@ services:
       Auth__Audience: ${OIDC_AUDIENCE:-qgp-api}
       Cors__AllowedOrigins: ${CORS_ALLOWED_ORIGINS:?set CORS_ALLOWED_ORIGINS}
       Otel__OtlpEndpoint: ${OTEL_OTLP_ENDPOINT:-}   # rỗng = tắt observability (ISC.Observability)
+    # Secret qua file /run/secrets/<KEY> → BE nạp bằng AddKeyPerFile (QgpSecrets, ADR-0012).
+    secrets:
+      - source: qgp_db_connection
+        target: QGP_DB_CONNECTION
+      - source: qgp_meili_key
+        target: QGP_MEILI_KEY
     volumes:
       - qgp_content:/data/content-repo
     restart: unless-stopped
@@ -85,13 +124,28 @@ services:
         VITE_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-qgp-web}
     depends_on:
       - api
+    # CSP render lúc start (apps/web/nginx/*.template): connect-src = origin Keycloak.
+    # Chạy Report-Only trước, xem console/không có vi phạm → CSP_HEADER=Content-Security-Policy để chặn.
+    environment:
+      CSP_CONNECT_SRC: ${KC_HOSTNAME:?set KC_HOSTNAME}
+      CSP_HEADER: ${CSP_HEADER:-Content-Security-Policy-Report-Only}
     ports:
       - "${WEB_HTTP_PORT:-80}:80"
       - "${WEB_HTTPS_PORT:-443}:443"
-    # TLS: mount cert khi bật block 443 trong nginx.conf.
+    # TLS: mount cert khi bật block 443 trong apps/web/nginx/default.conf.template.
     # volumes:
     #   - ./certs:/etc/nginx/certs:ro
     restart: unless-stopped
+
+# Docker secrets (A5, ADR-0012): mỗi secret 1 file, KHÔNG commit (deploy/secrets/ đã gitignore).
+# Đổi sang Vault Agent sau này: render ra cùng tên file, không phải sửa code. Xem deploy/SECRETS.md.
+secrets:
+  postgres_password:
+    file: ${QGP_SECRETS_DIR:-./secrets}/POSTGRES_PASSWORD
+  qgp_db_connection:
+    file: ${QGP_SECRETS_DIR:-./secrets}/QGP_DB_CONNECTION
+  qgp_meili_key:
+    file: ${QGP_SECRETS_DIR:-./secrets}/QGP_MEILI_KEY
 
 volumes:
   qgp_pgdata:

@@ -1,0 +1,80 @@
+{
+  "realm": "qgp",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      {
+        "name": "reader",
+        "description": "QGP READER — đọc tài liệu Effective"
+      },
+      {
+        "name": "contributor",
+        "description": "QGP CONTRIBUTOR — đóng góp KB"
+      },
+      {
+        "name": "author",
+        "description": "QGP AUTHOR — soạn/sửa DOC"
+      },
+      {
+        "name": "approver",
+        "description": "QGP APPROVER — duyệt DOC"
+      },
+      {
+        "name": "qa_lead",
+        "description": "QGP QA_LEAD — cấu hình/audit"
+      },
+      {
+        "name": "admin",
+        "description": "QGP ADMIN — quản trị hệ thống"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "qgp-api",
+      "name": "QGP API (resource server)",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "qgp-web",
+      "name": "QGP Web (SPA)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "rootUrl": "${QGP_WEB_ORIGIN}",
+      "baseUrl": "${QGP_WEB_ORIGIN}",
+      "redirectUris": [
+        "${QGP_WEB_ORIGIN}/*"
+      ],
+      "webOrigins": [
+        "${QGP_WEB_ORIGIN}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${QGP_WEB_ORIGIN}/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "qgp-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "qgp-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

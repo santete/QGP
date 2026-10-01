@@ -18,6 +18,8 @@ content-repo/
 **/.env.production
 *.local
 .env.*.local
+# Docker secrets prod (mỗi file 1 secret — deploy/SECRETS.md)
+deploy/secrets/
 # Khóa / chứng chỉ
 *.pem
 *.key
