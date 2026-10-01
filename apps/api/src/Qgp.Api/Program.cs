@@ -8,6 +8,7 @@ using Quartz;
 using Qgp.Api.Api;
 using Qgp.Api.Application;
 using Qgp.Api.Auth;
+using Qgp.Api.Infrastructure;
 using Qgp.Api.Infrastructure.Git;
 using Qgp.Api.Infrastructure.Persistence;
 using Qgp.Api.Infrastructure.Scheduling;
@@ -29,11 +30,8 @@ var obsEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["Otel:OtlpEndp
 if (obsEnabled)
     builder.AddStandardObservability(builder.Configuration["ServiceName"] ?? "qgp-api");
 
-// Connection string: env QGP_DB_CONNECTION > appsettings "Qgp". (Secret qua config, không hardcode.)
-var conn =
-    Environment.GetEnvironmentVariable("QGP_DB_CONNECTION")
-    ?? builder.Configuration.GetConnectionString("Qgp")
-    ?? "Host=localhost;Port=5432;Database=qgp_db;Username=qgp;Password=qgp";
+// Connection string: file secret > env QGP_DB_CONNECTION > appsettings "Qgp" (QgpSecrets).
+var conn = QgpSecrets.DbConnection(builder.Configuration);
 
 builder.Services.AddDbContext<QgpDbContext>(options =>
     options
@@ -77,11 +75,11 @@ var gitRepoPath = Environment.GetEnvironmentVariable("QGP_GIT_REPO_PATH")
 builder.Services.AddSingleton<IGitContentStore>(new LibGit2GitContentStore(gitRepoPath));
 
 // Search (Meilisearch REST). HttpClient có Authorization (mọi request) + timeout (R-TIMEOUT-MUST).
-// Secret master key qua env QGP_MEILI_KEY (fallback dev config).
+// Secret master key: file secret > env QGP_MEILI_KEY > dev config (QgpSecrets).
 builder.Services.AddHttpClient<ISearchIndex, MeiliSearchIndex>(http =>
 {
     var url = builder.Configuration["Meili:Url"] ?? "http://localhost:7700";
-    var key = Environment.GetEnvironmentVariable("QGP_MEILI_KEY") ?? builder.Configuration["Meili:ApiKey"];
+    var key = QgpSecrets.MeiliKey(builder.Configuration);
     http.BaseAddress = new Uri(url);
     http.Timeout = TimeSpan.FromSeconds(5);
     if (!string.IsNullOrEmpty(key))
