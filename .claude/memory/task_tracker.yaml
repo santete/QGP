@@ -1,124 +1,264 @@
-# Task Tracker — state sống ngoài context window
-# Đọc bởi /task-* commands, Phase 0, Phase 5
-# Git-committable, chia sẻ giữa sessions và team members
-# Chỉ dùng khi execution_mode = 2b (epic). 2a không cần.
-
-# ── Epic B — Governance gaps (S17 Admin/RBAC UI + DOC-F-08 review reminders) ──
-# Duyệt 2026-07-26: B0 projection = có · doc-types = CHIỀU SÂU (Type enum→string) · thứ tự B0→B2→B1.
-# ✅ EPIC B DONE (2026-07-26): B0 + B2 + toàn bộ B1 (BE + FE). BE 67/67 · FE 43/43 · build OK · openapi valid.
-#    CÒN LẠI (follow-up nhỏ): UI sửa audience per-document (BE + test XONG, chỉ thiếu màn — nên đặt ở DocumentPage).
 tasks:
-- id: "b0f0"
-  title: "B0 — User/role projection: UserProvisioningService.SyncAsync gọi ở GET /me"
+- id: b0f0
+  title: 'B0 — User/role projection: UserProvisioningService.SyncAsync gọi ở GET /me'
   status: closed
-  assignee: "claude"
-  blocks: ["b2a0", "b1a0"]
+  assignee: claude
+  blocks:
+  - b2a0
+  - b1a0
   blocked_by: []
   notes:
-    - date: "2026-07-26T01:00:00Z"
-      author: "claude"
-      text: "DONE. Upsert user ON CONFLICT + COALESCE profile + reconcile user_roles (mirror). Authz vẫn từ token. UserProvisioningTests 2/2."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T01:00:00Z"
-
-- id: "b2a0"
-  title: "B2 — Review-cycle reminders (DOC-F-08): ReviewReminderService + ReviewReminderJob (Quartz)"
+  - date: '2026-07-26T01:00:00Z'
+    author: claude
+    text: DONE. Upsert user ON CONFLICT + COALESCE profile + reconcile user_roles
+      (mirror). Authz vẫn từ token. UserProvisioningTests 2/2.
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T01:00:00Z'
+- id: b2a0
+  title: 'B2 — Review-cycle reminders (DOC-F-08): ReviewReminderService + ReviewReminderJob
+    (Quartz)'
   status: closed
-  assignee: "claude"
+  assignee: claude
   blocks: []
-  blocked_by: ["b0f0"]
+  blocked_by:
+  - b0f0
   notes:
-    - date: "2026-07-26T02:00:00Z"
-      author: "claude"
-      text: "DONE. Quét next_review_date ≤30d + overdue → notify QA_LEAD/ADMIN, dedupe theo (doc,type)/leadDays. Job daily gated-off Testing. ReviewReminderTests 1/1."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T02:00:00Z"
-
-- id: "b1a0"
-  title: "B1 BE — Admin read: GET /v1/admin/rbac (§10.1 read-only) + GET /v1/admin/users (projection)"
+  - date: '2026-07-26T02:00:00Z'
+    author: claude
+    text: DONE. Quét next_review_date ≤30d + overdue → notify QA_LEAD/ADMIN, dedupe
+      theo (doc,type)/leadDays. Job daily gated-off Testing. ReviewReminderTests 1/1.
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T02:00:00Z'
+- id: b1a0
+  title: 'B1 BE — Admin read: GET /v1/admin/rbac (§10.1 read-only) + GET /v1/admin/users
+    (projection)'
   status: closed
-  assignee: "claude"
-  blocks: ["b1f0"]
-  blocked_by: ["b0f0"]
+  assignee: claude
+  blocks:
+  - b1f0
+  blocked_by:
+  - b0f0
   notes:
-    - date: "2026-07-26T03:00:00Z"
-      author: "claude"
-      text: "DONE. AdminService.GetRbacAsync (QgpPolicies.RolesFor) + ListUsersAsync. AdminApiTests."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T03:00:00Z"
-
-- id: "b1b0"
-  title: "B1 BE — Tags CRUD: GET/POST/PATCH/DELETE /v1/admin/tags"
+  - date: '2026-07-26T03:00:00Z'
+    author: claude
+    text: DONE. AdminService.GetRbacAsync (QgpPolicies.RolesFor) + ListUsersAsync.
+      AdminApiTests.
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T03:00:00Z'
+- id: b1b0
+  title: 'B1 BE — Tags CRUD: GET/POST/PATCH/DELETE /v1/admin/tags'
   status: closed
-  assignee: "claude"
-  blocks: ["b1f0"]
+  assignee: claude
+  blocks:
+  - b1f0
   blocked_by: []
   notes:
-    - date: "2026-07-26T03:00:00Z"
-      author: "claude"
-      text: "DONE. AdminService tags CRUD (slug unique TAG_SLUG_CONFLICT; xoá chặn TAG_IN_USE). AdminApiTests."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T03:00:00Z"
-
-- id: "b1c0"
-  title: "B1 BE — Doc audience: GET/PUT /v1/documents/{docId}/audience"
+  - date: '2026-07-26T03:00:00Z'
+    author: claude
+    text: DONE. AdminService tags CRUD (slug unique TAG_SLUG_CONFLICT; xoá chặn TAG_IN_USE).
+      AdminApiTests.
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T03:00:00Z'
+- id: b1c0
+  title: 'B1 BE — Doc audience: GET/PUT /v1/documents/{docId}/audience'
   status: closed
-  assignee: "claude"
-  blocks: ["b1f0"]
+  assignee: claude
+  blocks:
+  - b1f0
   blocked_by: []
   notes:
-    - date: "2026-07-26T03:30:00Z"
-      author: "claude"
-      text: "DONE. DocumentService.Get/SetAudienceAsync (reconcile, validate role, audit document.audience_updated). DocAudienceTests."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T03:30:00Z"
-
-- id: "b1d0"
-  title: "B1 BE — Doc types CHIỀU SÂU: bảng doc_types + Type enum→string + refactor + CRUD"
+  - date: '2026-07-26T03:30:00Z'
+    author: claude
+    text: DONE. DocumentService.Get/SetAudienceAsync (reconcile, validate role, audit
+      document.audience_updated). DocAudienceTests.
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T03:30:00Z'
+- id: b1d0
+  title: 'B1 BE — Doc types CHIỀU SÂU: bảng doc_types + Type enum→string + refactor
+    + CRUD'
   status: closed
-  assignee: "claude"
-  blocks: ["b1f0"]
+  assignee: claude
+  blocks:
+  - b1f0
   blocked_by: []
   notes:
-    - date: "2026-07-26T04:00:00Z"
-      author: "claude"
-      text: "DONE. DocType entity + DbSet + config + seed 7. Document.Type enum→string. Xoá DocumentType.cs + Mapping.DocType*. Sửa DocumentService(validate)/Search/ReportService/DevDataSeeder. Migration AddDocTypes (+data fix WorkInstruction→'Work Instruction'). CRUD /admin/doc-types + GET /doc-types active. DocTypesTests. Full suite 67/67 xanh (0 regression)."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T04:00:00Z"
-
-- id: "b1f0"
-  title: "B1 FE — AdminPage /admin (S17) tabs: RBAC/Users/Tags/DocTypes"
+  - date: '2026-07-26T04:00:00Z'
+    author: claude
+    text: DONE. DocType entity + DbSet + config + seed 7. Document.Type enum→string.
+      Xoá DocumentType.cs + Mapping.DocType*. Sửa DocumentService(validate)/Search/ReportService/DevDataSeeder.
+      Migration AddDocTypes (+data fix WorkInstruction→'Work Instruction'). CRUD /admin/doc-types
+      + GET /doc-types active. DocTypesTests. Full suite 67/67 xanh (0 regression).
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T04:00:00Z'
+- id: b1f0
+  title: 'B1 FE — AdminPage /admin (S17) tabs: RBAC/Users/Tags/DocTypes'
   status: closed
-  assignee: "claude"
+  assignee: claude
   blocks: []
-  blocked_by: ["b1a0", "b1b0", "b1d0"]
+  blocked_by:
+  - b1a0
+  - b1b0
+  - b1d0
   notes:
-    - date: "2026-07-26T05:00:00Z"
-      author: "claude"
-      text: "DONE. AdminPage 4 tab + client/mock/types (local interface, openapi loose). FE 43/43 · typecheck · vite build OK. Audience UI HOÃN (BE xong) → đặt ở DocumentPage sau."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T05:00:00Z"
-
-- id: "b1z0"
-  title: "B1/B2 docs — openapi.yaml (admin paths) + schema_snapshot.yaml"
+  - date: '2026-07-26T05:00:00Z'
+    author: claude
+    text: DONE. AdminPage 4 tab + client/mock/types (local interface, openapi loose).
+      FE 43/43 · typecheck · vite build OK. Audience UI HOÃN (BE xong) → đặt ở DocumentPage
+      sau.
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T05:00:00Z'
+- id: b1z0
+  title: B1/B2 docs — openapi.yaml (admin paths) + schema_snapshot.yaml
   status: closed
-  assignee: "claude"
+  assignee: claude
   blocks: []
-  blocked_by: ["b1a0", "b1b0", "b1c0", "b1d0", "b2a0"]
+  blocked_by:
+  - b1a0
+  - b1b0
+  - b1c0
+  - b1d0
+  - b2a0
   notes:
-    - date: "2026-07-26T05:30:00Z"
-      author: "claude"
-      text: "DONE. openapi.yaml +tag Admin +8 path (Redocly valid; nhớ OpenAPI 3.1 KHÔNG có 'nullable', mỗi operation cần 1 4xx). schema_snapshot: doc_types table + documents.type=string + admin_s17 endpoints + users projection + notif review types."
-  created_at: "2026-07-26T00:00:00Z"
-  updated_at: "2026-07-26T05:30:00Z"
-
-# ── Follow-up (mở, ưu tiên thấp) ──────────────────────────────────
-- id: "b1c1"
-  title: "B1 FE follow-up — màn sửa audience per-document (đặt ở DocumentPage; BE GET/PUT /documents/{docId}/audience đã xong + test)"
-  status: open
+  - date: '2026-07-26T05:30:00Z'
+    author: claude
+    text: 'DONE. openapi.yaml +tag Admin +8 path (Redocly valid; nhớ OpenAPI 3.1 KHÔNG
+      có ''nullable'', mỗi operation cần 1 4xx). schema_snapshot: doc_types table
+      + documents.type=string + admin_s17 endpoints + users projection + notif review
+      types.'
+  created_at: '2026-07-26T00:00:00Z'
+  updated_at: '2026-07-26T05:30:00Z'
+- id: b1c1
+  title: B1 FE follow-up — màn sửa audience per-document (đặt ở DocumentPage; BE GET/PUT
+    /documents/{docId}/audience đã xong + test)
+  status: closed
   assignee: null
   blocks: []
   blocked_by: []
-  notes: []
-  created_at: "2026-07-26T05:30:00Z"
-  updated_at: "2026-07-26T05:30:00Z"
+  notes:
+  - date: '2026-10-01T11:04:03Z'
+    author: current-session
+    text: 'Done in commit 4ec0daf (2026-09-14): AudiencePanel.tsx + useAudience.ts
+      in DocumentPage (QA_LEAD/ADMIN). FE 46/46, typecheck 0. Closed retroactively
+      2026-10-01 (was never claimed).'
+  created_at: '2026-07-26T05:30:00Z'
+  updated_at: '2026-10-01T11:04:03Z'
+- id: tsk-691b
+  title: 'OPS#1 BE — QgpSecrets: đọc DB conn + Meili key qua IConfiguration (file
+    > env > appsettings)'
+  status: closed
+  assignee: current-session
+  blocks:
+  - tsk-ce17
+  - tsk-27d6
+  blocked_by: []
+  notes:
+  - date: '2026-10-01T12:28:42Z'
+    author: current-session
+    text: QgpSecrets.DbConnection/MeiliKey (Infrastructure/QgpSecrets.cs), Program.cs
+      dùng. 3 test SecretConfigTests. BE 70/70.
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:28:42Z'
+- id: tsk-af0f
+  title: OPS#2 Migrate khi deploy — Dockerfile stage migrator (EF bundle) + service
+    migrate
+  status: closed
+  assignee: current-session
+  blocks:
+  - tsk-ce17
+  - tsk-27d6
+  blocked_by: []
+  notes:
+  - date: '2026-10-01T12:32:04Z'
+    author: current-session
+    text: Dockerfile stage bundle+migrator; compose service migrate, api depends service_completed_successfully.
+      verify-golive.sh migrator xanh 8/8.
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:32:05Z'
+- id: tsk-ce17
+  title: 'OPS#3 Docker secrets — compose secrets: QGP_DB_CONNECTION/QGP_MEILI_KEY/POSTGRES_PASSWORD'
+  status: closed
+  assignee: current-session
+  blocks:
+  - tsk-27d6
+  blocked_by:
+  - tsk-691b
+  - tsk-af0f
+  notes:
+  - date: '2026-10-01T12:33:16Z'
+    author: current-session
+    text: 'compose secrets: postgres_password (POSTGRES_PASSWORD_FILE), qgp_db_connection
+      (migrate+api), qgp_meili_key (api). QGP_SECRETS_DIR mặc định ./secrets. Gitignore
+      deploy/secrets/. Verify: api Production chỉ file secret → healthz Healthy. Gotcha:
+      file phải 0644 (container non-root).'
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:33:16Z'
+- id: tsk-41c0
+  title: OPS#4 Keycloak prod — start + DB postgres + realm prod không user mẫu
+  status: closed
+  assignee: current-session
+  blocks:
+  - tsk-27d6
+  blocked_by: []
+  notes:
+  - date: '2026-10-01T12:35:51Z'
+    author: current-session
+    text: keycloak start --import-realm, KC_DB postgres (init script deploy/postgres/init/10-keycloak-db.sh),
+      KC_HOSTNAME/KC_PROXY_HEADERS, realm-qgp.prod.json (0 user, sslRequired external,
+      no password grant, ${QGP_WEB_ORIGIN} placeholder verified). verify-golive keycloak
+      xanh.
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:35:51Z'
+- id: tsk-f6d3
+  title: OPS#5 CSP nginx template (Report-Only mặc định) + fix /assets mất security
+    header
+  status: closed
+  assignee: current-session
+  blocks:
+  - tsk-27d6
+  blocked_by: []
+  notes:
+  - date: '2026-10-01T12:38:19Z'
+    author: current-session
+    text: nginx.conf → apps/web/nginx/default.conf.template + security-headers.inc.template
+      (envsubst CSP_*). Dockerfile ENV defaults Report-Only. Fix /assets mất header.
+      CSP thêm Google Fonts. compose web env CSP_CONNECT_SRC=KC_HOSTNAME.
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:38:19Z'
+- id: tsk-988e
+  title: OPS#6 Observability compose riêng — collector/Prometheus/Tempo/Loki/Grafana
+  status: closed
+  assignee: current-session
+  blocks:
+  - tsk-27d6
+  blocked_by: []
+  notes:
+  - date: '2026-10-01T12:43:27Z'
+    author: current-session
+    text: 'deploy/observability/: compose (qgp-obs, network app external qgp-prod_default),
+      collector 0.111.0, prometheus v2.54.1, tempo 2.6.0, loki 3.2.0, grafana 11.2.2
+      (bind 127.0.0.1). Gotcha: Grafana Tempo plugin không có /health → ping /api/echo.
+      E2E trace qgp-api OK. Loki: pipeline logs có nhưng chưa verify ISC.Observability
+      export log OTLP.'
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:43:27Z'
+- id: tsk-27d6
+  title: OPS#7 Docs — DEPLOY.md/SECRETS.md/.env.prod.example/.gitignore + verify-golive.sh
+    full
+  status: closed
+  assignee: current-session
+  blocks: []
+  blocked_by:
+  - tsk-691b
+  - tsk-af0f
+  - tsk-ce17
+  - tsk-41c0
+  - tsk-f6d3
+  - tsk-988e
+  notes:
+  - date: '2026-10-01T12:47:39Z'
+    author: current-session
+    text: 'DEPLOY.md §1/2/3/4/5/7/8/10, SECRETS.md (Docker secrets + giới hạn env),
+      .env.prod.example, .gitignore deploy/secrets/, PROJECT_MAP. verify-golive.sh
+      all: 11/11 xanh (1m29s). BE 70/70, FE 46/46.'
+  created_at: '2026-10-01T11:46:39Z'
+  updated_at: '2026-10-01T12:47:39Z'

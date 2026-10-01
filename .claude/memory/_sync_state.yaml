@@ -19,9 +19,9 @@
 # synced_at_commit — full SHA of HEAD when memory was last in sync
 # synced_at_ts     — epoch seconds, informational only
 # synced_by        — /classify | /done | /check-drift --baseline | manual
-synced_at_commit: ""
-synced_at_ts: 0
-synced_by: ""
+synced_at_commit: "a88bf13997194a7da900bc2566699d811ee087c0"
+synced_at_ts: 1790852729
+synced_by: "manual"
 
 # Globs that count as "the codebase". A change inside any of these between
 # synced_at_commit and HEAD raises drift. Kept conservative — over-reporting
@@ -34,6 +34,9 @@ watched_paths:
   - internal/**
   - pkg/**
   - cmd/**
+  # QGP monorepo: apps/api (.NET) + apps/web (React) + API contracts
+  - apps/**
+  - product-spec/api/**
   # Schema / migrations
   - migrations/**
   - db/**

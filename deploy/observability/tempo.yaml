@@ -1,0 +1,22 @@
+# Tempo single-binary — nhận trace OTLP gRPC từ otel-collector, lưu local (volume tempo_data).
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+compactor:
+  compaction:
+    block_retention: 336h   # 14 ngày, khớp retention Loki
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal
