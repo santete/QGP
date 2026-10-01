@@ -48,7 +48,7 @@ qms-governance-platform/
 │   │   │   ├── i18n/               # strings.ts (tiếng Việt)
 │   │   │   ├── pages/             # HomePage, DocumentPage, AdminPage, ReportsPage…
 │   │   │   └── test/              # Vitest (*.test.tsx), setup.ts
-│   │   ├── nginx.conf             # Reverse proxy + security headers (prod)
+│   │   ├── nginx/                 # *.conf.template: reverse proxy + security headers/CSP (envsubst CSP_*)
 │   │   └── package.json           # scripts: dev, build, test, typecheck, gen:api
 │   └── rag/                       # (Phase 3, chưa tạo — ADR-0007 Python service riêng)
 ├── product-spec/                  # PRD, SDD, ADR, openapi.yaml, BUILD_PLAN, ROADMAP
@@ -56,7 +56,8 @@ qms-governance-platform/
 │   └── api/openapi.yaml           # Single source cho API contract (FE gen:api)
 ├── docs/ai/                       # Rule cho AI agent (file này, CLAUDE.md, GIT_CONVENTION.md…)
 ├── .claude/memory/                # L2 memory: project_state.yaml, task_tracker.yaml, schema_snapshot.yaml
-├── deploy/                        # docker-compose.yml (local), docker-compose.prod.yml, keycloak/, backup/
+├── deploy/                        # docker-compose.yml (local), docker-compose.prod.yml, keycloak/, postgres/init/,
+│                                  # observability/ (Grafana stack), backup/, verify-golive.sh, secrets/ (gitignored)
 └── .gitlab-ci.yml                 # CI: build BE+FE, openapi lint (Redocly)
 ```
 
@@ -68,7 +69,7 @@ qms-governance-platform/
 |--------------|---------------------------------------------|---------------------------------------------|
 | auth         | `apps/api/src/Qgp.Api/Auth/`                | Keycloak OIDC, dev-login, RBAC policy §10.1 |
 | application  | `apps/api/src/Qgp.Api/Application/`         | 19 service: Document, Version, Search, Report, Recommendation, Onboarding, Notification, Subscription, Admin, Feedback, Audit… |
-| infrastructure | `apps/api/src/Qgp.Api/Infrastructure/`    | Persistence (QgpDbContext, Migrations), Search (MeiliSearchIndex), Scheduling (Quartz), Git (content store) |
+| infrastructure | `apps/api/src/Qgp.Api/Infrastructure/`    | Persistence (QgpDbContext, Migrations), Search (MeiliSearchIndex), Scheduling (Quartz), Git (content store), QgpSecrets (file > env > appsettings) |
 | api          | `apps/api/src/Qgp.Api/Api/V1Endpoints.cs`   | Minimal API routes /v1/* + /auth + /admin/*
 | domain       | `apps/api/src/Qgp.Api/Domain/`              | Entities, Enums (Business Rules), value objects |
 | contracts    | `apps/api/src/Qgp.Api/Contracts/Dtos.cs`   | Request/response DTO (mirror openapi.yaml) |

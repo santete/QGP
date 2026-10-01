@@ -10,6 +10,7 @@ Stack: Docker + docker-compose + Nginx (+TLS) trên Ubuntu. GitLab CI: validate 
 |---|---|---|
 | `qgp-api` | `apps/api` | .NET 8, multi-stage, chạy non-root (`app`), lắng `:8080`, content-repo ở volume `/data/content-repo` |
 | `qgp-web` | `apps/web` | Vite build → Nginx serve SPA + reverse-proxy `/v1`,`/auth`,`/healthz` → service `api` |
+| `qgp-api` target `migrator` | `apps/api` | EF migration bundle — chạy một lần trước `api` (service `migrate`) |
 
 Build thử cục bộ:
 ```bash
@@ -24,19 +25,38 @@ docker build -t qgp-web --build-arg VITE_OIDC_AUTHORITY=http://localhost:8081/re
 ## 2. Chạy full stack (staging/prod)
 
 ```bash
-cp deploy/.env.prod.example deploy/.env.prod      # rồi điền secret thật
+cp deploy/.env.prod.example deploy/.env.prod      # rồi điền giá trị thật
+# Docker secrets (deploy/SECRETS.md): 3 file, mỗi file 1 giá trị
+install -d -m 700 deploy/secrets
+printf '%s' 'mat-khau-postgres' > deploy/secrets/POSTGRES_PASSWORD
+printf '%s' 'Host=postgres;Port=5432;Database=qgp_db;Username=qgp;Password=mat-khau-postgres' > deploy/secrets/QGP_DB_CONNECTION
+printf '%s' 'meili-master-key-trung-MEILI_MASTER_KEY' > deploy/secrets/QGP_MEILI_KEY
+chmod 644 deploy/secrets/*                          # container chạy non-root phải đọc được
 docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
 ```
 
-Thành phần: `postgres` · `meilisearch` · `redis` · `keycloak` · `api` · `web`.
+Thành phần: `postgres` · `meilisearch` · `redis` · `keycloak` · `migrate` (chạy một lần) · `api` · `web`.
 Điểm vào công khai duy nhất = `web` (Nginx) cổng 80/443. Keycloak mở riêng cổng `${KEYCLOAK_PORT}`
 (trình duyệt gọi thẳng IdP để login — không đi qua Nginx).
 
-Áp migration DB lần đầu (schema qgp): API tự KHÔNG chạy migration ở Production. Chạy tay:
+**Migration DB tự động:** API KHÔNG tự migrate ở Production. Service `migrate` (image target `migrator`,
+EF bundle) chạy `efbundle` một lần rồi thoát; `api` chỉ start khi `migrate` exit 0
+(`service_completed_successfully`). Bundle idempotent — chạy lại khi không có migration mới là no-op.
+Connection đọc từ secret `/run/secrets/QGP_DB_CONNECTION` (hoặc env `QGP_DB_CONNECTION`).
+
 ```bash
-docker compose -f deploy/docker-compose.prod.yml exec api \
-  sh -c "cd /app && DOTNET... "   # hoặc dùng job riêng
-# Đơn giản hơn: chạy `dotnet ef database update` từ máy CI trỏ QGP_DB_CONNECTION vào Postgres prod.
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod logs migrate   # xem kết quả
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod run --rm migrate  # chạy lại tay
+```
+
+> Trước khi deploy bản có migration mới: review SQL bằng
+> `dotnet ef migrations script --idempotent --project apps/api/src/Qgp.Api` (không có DROP/ALTER phá data),
+> và backup DB (§9).
+
+**Kiểm chứng cục bộ trước go-live** (không chạm prod, container tạm `qgp-verify-*`):
+```bash
+deploy/verify-golive.sh            # all: migrator · secrets · keycloak · csp · observability
+deploy/verify-golive.sh csp        # từng phần
 ```
 
 ---
@@ -45,18 +65,23 @@ docker compose -f deploy/docker-compose.prod.yml exec api \
 
 | Biến | Ý nghĩa |
 |---|---|
-| `POSTGRES_PASSWORD`, `MEILI_MASTER_KEY` | secret DB / search |
+| `deploy/secrets/*` | secret DB / Meili (Docker secrets, không phải env) — `SECRETS.md` |
+| `MEILI_MASTER_KEY` | key cho container Meili (không hỗ trợ `*_FILE`) — trùng `secrets/QGP_MEILI_KEY` |
 | `OIDC_AUTHORITY` | URL realm Keycloak **trình duyệt** truy cập được (prod: https) |
 | `OIDC_REQUIRE_HTTPS` | `true` ở prod (https), `false` nếu Keycloak chạy http nội bộ |
 | `CORS_ALLOWED_ORIGINS` | origin FE thật, csv nếu nhiều — thay hardcode `localhost:5173` |
-| `KEYCLOAK_ADMIN_PASSWORD` | mật khẩu admin Keycloak |
+| `KEYCLOAK_ADMIN_PASSWORD` | mật khẩu admin Keycloak (bootstrap) |
+| `KC_HOSTNAME` | URL công khai Keycloak; cũng là `connect-src` của CSP |
+| `KC_DB_PASSWORD` | mật khẩu DB `keycloak` |
+| `QGP_WEB_ORIGIN` | origin FE → redirect URI client `qgp-web` (realm prod) |
+| `CSP_HEADER` | `Content-Security-Policy-Report-Only` (mặc định) / `Content-Security-Policy` |
 
 ---
 
 ## 4. TLS (Nginx)
 
-Mặc định `apps/web/nginx.conf` chạy HTTP (đặt sau LB hoặc dev). Bật HTTPS tại Nginx:
-1. Bỏ comment block `server { listen 443 ssl; ... }` trong `nginx.conf` + dòng redirect 80→443.
+Mặc định `apps/web/nginx/default.conf.template` chạy HTTP (đặt sau LB hoặc dev). Bật HTTPS tại Nginx:
+1. Bỏ comment block `server { listen 443 ssl; ... }` trong template + dòng redirect 80→443.
 2. Mount cert vào `/etc/nginx/certs` (bỏ comment `volumes` của service `web` trong compose).
 3. Cert:
    - **Prod**: Let's Encrypt (certbot) hoặc cert nội bộ → `fullchain.pem` + `privkey.pem`.
@@ -70,12 +95,28 @@ Mặc định `apps/web/nginx.conf` chạy HTTP (đặt sau LB hoặc dev). Bậ
 
 ---
 
-## 5. Keycloak prod hardening (ngoài phạm vi A3+A4, để hạng mục sau)
+## 5. Keycloak prod
 
-Compose hiện dùng `start-dev --import-realm` (H2 in-memory, tiện staging). Prod thật cần:
-- `start` (không `-dev`) + DB ngoài (`KC_DB=postgres`, `KC_DB_URL`, `KC_DB_USERNAME/PASSWORD`).
-- `KC_HOSTNAME` cố định + TLS (hoặc sau reverse proxy với `KC_PROXY_HEADERS=xforwarded`).
-- Realm quản lý qua export/import có kiểm soát, KHÔNG dùng user mẫu `Password123!`.
+Compose prod chạy `start --import-realm` (không `-dev`):
+- **DB:** Postgres chung instance, DB + role riêng `keycloak` (`KC_DB=postgres`). Tạo bởi
+  `deploy/postgres/init/10-keycloak-db.sh` — **chỉ chạy khi volume Postgres còn trống**.
+  Volume đã có dữ liệu → tạo tay một lần:
+  ```bash
+  # biến psql chỉ được thay khi SQL đi qua stdin (KHÔNG thay trong -c)
+  docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod exec -T postgres \
+    psql -v ON_ERROR_STOP=1 -U qgp -d qgp_db -v kc_pass='<KC_DB_PASSWORD>' <<'SQL'
+  CREATE ROLE keycloak LOGIN PASSWORD :'kc_pass';
+  CREATE DATABASE keycloak OWNER keycloak;
+  SQL
+  ```
+- **Hostname/TLS:** `KC_HOSTNAME` = URL công khai (https). TLS terminate ở reverse proxy/LB phía trước,
+  Keycloak tin header `X-Forwarded-*` (`KC_PROXY_HEADERS=xforwarded`). Proxy PHẢI ghi đè các header này.
+- **Realm:** `deploy/keycloak/realm-qgp.prod.json` — roles + clients `qgp-api`/`qgp-web`, **không user mẫu**,
+  `sslRequired=external`, tắt password grant (`directAccessGrantsEnabled=false`). `${QGP_WEB_ORIGIN}` được
+  Keycloak thay từ env lúc import. Import **bỏ qua nếu realm `qgp` đã tồn tại** → đổi cấu hình realm sau đó
+  qua Admin Console/`kcadm.sh`, không sửa file. `realm-qgp.json` (user mẫu `Password123!`) **chỉ dùng dev**.
+- **User:** tạo qua Admin Console hoặc federation (LDAP/AD); gán realm role QGP (`reader`…`admin`).
+- **Health:** `KC_HEALTH_ENABLED=true` → `/health/ready` trên management port 9000 (không publish).
 
 ---
 
@@ -97,15 +138,20 @@ registry mặc định GitLab tự cấp (`CI_REGISTRY*`).
   `RateLimit__AuthPermitLimit` (10), `RateLimit__AuthWindowSeconds` (60), `RateLimit__Enabled`.
   Vượt ngưỡng → `429`. IP thật lấy từ `X-Forwarded-For` (đã bật ForwardedHeaders — ingress duy nhất là nginx).
 - **Security headers**: BE gắn `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
-  Nginx (SPA) gắn thêm 3 header đó; **CSP** để sẵn (comment) trong `apps/web/nginx.conf` —
-  bật + điền origin Keycloak vào `connect-src` khi go-live (sai origin sẽ chặn login OIDC).
+  Nginx (SPA) gắn 3 header đó + **CSP** từ `apps/web/nginx/security-headers.inc.template` (cả `/assets/`).
+- **CSP**: render lúc container start từ env (không build lại khi đổi domain):
+  `CSP_CONNECT_SRC` = origin Keycloak (compose lấy `KC_HOSTNAME`), `CSP_HEADER` mặc định
+  `Content-Security-Policy-Report-Only` — chỉ báo vi phạm ở console trình duyệt, không chặn.
+  Quy trình: go-live với Report-Only → đăng nhập SSO + đi các màn chính, xem console không có
+  `[Report Only]` → đặt `CSP_HEADER=Content-Security-Policy` trong `.env.prod` → `up -d web`.
+  Policy cho phép Google Fonts (`src/theme/tokens.css` @import Inter).
 - **HTTPS-redirect + HSTS**: bật block `443` trong `nginx.conf` (mục 4).
 
 ## 8. Secrets (A5, ADR-0012)
 
 Xem **`deploy/SECRETS.md`**. Tóm tắt: dev = .NET Secret Manager · CI = GitLab masked vars ·
-prod = Vault Agent render ra `/run/secrets` → BE tự nạp (`AddKeyPerFile`, `QGP_SECRETS_DIR`).
-Chuyển secret nhạy cảm khỏi `.env.prod` sang Vault khi lên prod thật.
+prod = **Docker secrets** (`deploy/secrets/*` → `/run/secrets/<KEY>`) → BE nạp qua `AddKeyPerFile`
+(`QgpSecrets`: file > env > appsettings). Lên Vault sau: Vault Agent render ra cùng tên file, không sửa code.
 
 ## 9. Backup (A6)
 
@@ -132,5 +178,20 @@ Các cờ instrumentation (`appsettings.json` → `Otel`): `EnableEntityFramewor
 `EnableRedis/Mongo/MassTransit/Grpc=false` (khớp stack QGP).
 
 Đích export = OpenTelemetry Collector → Prometheus (metrics) / Tempo (traces) / Loki (logs) / Grafana —
-deploy stack Grafana riêng (ngoài compose app). Envelope lỗi ADR-0014 GIỮ NGUYÊN (đã verify: ISC log
+stack riêng **`deploy/observability/docker-compose.yml`** (project `qgp-obs`), chạy SAU app stack:
+
+```bash
+docker compose -f deploy/observability/docker-compose.yml --env-file deploy/.env.prod up -d
+ssh -L 3000:127.0.0.1:3000 <host>    # Grafana chỉ bind loopback → mở http://localhost:3000
+```
+
+| Thành phần | Image | Vai trò |
+|---|---|---|
+| `otel-collector` | `otel/opentelemetry-collector-contrib:0.111.0` | nhận OTLP :4317/:4318, gắn vào network app (`QGP_APP_NETWORK`) |
+| `prometheus` | `prom/prometheus:v2.54.1` | scrape collector :8889, retention `PROMETHEUS_RETENTION` (15d) |
+| `tempo` | `grafana/tempo:2.6.0` | traces, lưu local 14 ngày |
+| `loki` | `grafana/loki:3.2.0` | logs qua OTLP (`/otlp`), 14 ngày |
+| `grafana` | `grafana/grafana:11.2.2` | datasource provision sẵn (uid `prometheus`/`tempo`/`loki`) |
+
+Chưa chạy stack này thì để `OTEL_OTLP_ENDPOINT` rỗng (tắt export) — tránh api export tới host không tồn tại. Envelope lỗi ADR-0014 GIỮ NGUYÊN (đã verify: ISC log
 exception kèm TraceId, `QgpExceptionHandler` vẫn trả `{error:{code,message}}`).
