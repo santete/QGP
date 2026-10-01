@@ -22,6 +22,12 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
 RUN npm run build
 
 FROM nginx:1.27-alpine AS final
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Template render lúc start (entrypoint nginx image) → đổi CSP/origin KHÔNG phải build lại.
+# Mặc định Report-Only (chỉ báo vi phạm); prod enforce: CSP_HEADER=Content-Security-Policy.
+ENV NGINX_ENVSUBST_FILTER=^CSP_ \
+    CSP_HEADER=Content-Security-Policy-Report-Only \
+    CSP_CONNECT_SRC=""
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx/default.conf.template nginx/security-headers.inc.template /etc/nginx/templates/
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80 443
