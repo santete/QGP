@@ -19,8 +19,8 @@
 # synced_at_commit — full SHA of HEAD when memory was last in sync
 # synced_at_ts     — epoch seconds, informational only
 # synced_by        — /classify | /done | /check-drift --baseline | manual
-synced_at_commit: "a88bf13997194a7da900bc2566699d811ee087c0"
-synced_at_ts: 1790852729
+synced_at_commit: "3fe5410c16dca531701d045d9fedaf75eeb9fce1"
+synced_at_ts: 1790908759
 synced_by: "manual"
 
 # Globs that count as "the codebase". A change inside any of these between

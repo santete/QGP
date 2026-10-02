@@ -6,8 +6,7 @@
 pattern: B                          # A | B | C — re-classify 2026-10-01: GIỮ B (user chốt), code LOC 38616 < 100k
 classified_at: "2026-10-01"
 loc_at_classification: 38616        # /classify Bước 1: chỉ file code (cs/ts/tsx/py/js…), bỏ .claude/ + docs/ai/ — 273 file
-# ⚠️ Phase 0 step 3 đo `git ls-files | xargs wc -l` (MỌI file: md/yaml/json/lock) = 100592 ở 2026-10-01 → so với
-#    threshold này sẽ báo sớm hơn thực tế. Khi trigger: đo lại bằng lệnh /classify Bước 1 trước khi đổi pattern.
+# Phase 0 step 3 (CLAUDE.md) đo cùng cách /classify Bước 1 từ 2026-10-02 (trước đó đếm MỌI file → 100592, báo sai).
 next_review_threshold: 120000       # Pattern B (skill /classify gợi ý 120000)
 team_size: 1
 
@@ -281,7 +280,7 @@ known_gotchas:
   files_affected: [apps/api/src/Qgp.Api/Infrastructure/QgpSecrets.cs, apps/api/src/Qgp.Api/Program.cs]
   discovered_at: "2026-10-01"
 - discovery: "Hooks trong .claude/settings.json gọi script bằng path tương đối → nếu Bash 'cd' sang thư mục con, cwd session đổi và MỌI hook fail (exit 2 = block), kể cả lệnh cd quay lại."
-  workaround: "KHÔNG cd trong Bash; dùng path tuyệt đối (dotnet test <sln>, npm --prefix <dir>). Bị kẹt → user chạy '! cd <repo root>'. Fix gốc (chưa làm, user giữ nguyên .claude/): dùng $CLAUDE_PROJECT_DIR trong hook command."
+  workaround: "KHÔNG cd trong Bash; dùng path tuyệt đối (dotnet test <sln>, npm --prefix <dir>). Bị kẹt → user chạy '! cd <repo root>'. Fix gốc ĐÃ LÀM 2026-10-02: settings.json hook + statusline dùng \"$CLAUDE_PROJECT_DIR\"/.claude/... (verify: chạy từ apps/api exit 0, form cũ exit 2)."
   files_affected: [.claude/settings.json]
   discovered_at: "2026-10-01"
 - discovery: "Infra ops: (1) 'dotnet ef ... -c' là --context, KHÔNG phải configuration. (2) postgres image: pg_isready OK cả khi server TẠM của initdb đang chạy → chờ log 'init process complete'. (3) psql chỉ thay biến :'x' khi SQL qua stdin, KHÔNG trong -c. (4) nginx add_header trong location ghi đè toàn bộ header của server → include security-headers.inc ở mọi location có add_header. (5) Grafana 11.2 plugin Tempo không có /api/datasources/uid/tempo/health → ping /api/datasources/proxy/uid/tempo/api/echo. (6) Compose secrets (không Swarm) = bind-mount giữ owner/mode host → file 0644 cho container non-root. (7) Keycloak realm import thay ${ENV} từ env (đã verify KC 26.0). (8) Máy dev dùng docker legacy builder → build final api cũng build stage bundle (chậm hơn, vẫn đúng)."
