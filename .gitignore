@@ -29,6 +29,7 @@ deploy/secrets/
 
 # --- Claude Code: code graph sinh tự động, không commit (per CLAUDE.md Reference Map) ---
 .claude/memory/code_graph.json
+.claude/memory/*.yaml.bak
 
 # --- Build / package artifact phạm vi repo ---
 node_modules/
@@ -60,3 +61,7 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# --- Python bytecode (hook scripts .claude/hooks/python) ---
+__pycache__/
+*.pyc
