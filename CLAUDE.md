@@ -18,7 +18,9 @@
    - Last task, decisions, known_gotchas, pending_tasks
    - `loc_at_classification` và `next_review_threshold`
 3. **Auto re-classification check**:
-   - Đo LOC hiện tại: `git ls-files | xargs wc -l 2>/dev/null | tail -1`
+   - Đo LOC hiện tại (CHỈ file code, cùng cách đo với `/classify` Bước 1 — bỏ `.claude/` + `docs/ai/`):
+     `git ls-files | grep -E '\.(py|js|ts|jsx|tsx|java|go|rb|php|cs|cpp|c|h|swift|kt|rs|scala|vue|svelte)$' | grep -vE '^(\.claude|docs/ai)/' | xargs wc -l 2>/dev/null | tail -1`
+     (KHÔNG đếm mọi file — md/yaml/json/lock làm số LOC phình, báo vượt threshold sai)
    - Nếu LOC > `next_review_threshold` → STOP, suggest user chạy `/classify` lại
 4. **Internal/compliance rules entry point** (BẮT BUỘC nếu thư mục tồn tại):
    - Nếu tồn tại `@docs/ai/internal_rules/00_INDEX.md` → load **TRƯỚC** mọi rule khác.
